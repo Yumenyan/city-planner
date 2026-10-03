@@ -4,7 +4,7 @@
 建物は**現代建築のみ**(マンション・オフィス・駅・病院・商業施設など 42 種)。
 
 ```
-WebUI (webui/citybuilder-planner.html)  ──city.json──▶  サーバー (Mod + templates + catalog.json)
+WebUI (index.html)  ──city.json──▶  サーバー (Mod + templates + catalog.json)
                                                            │  カタログ情報だけを同期
                                                            ▼
                                                     クライアント(専用Mod)
@@ -20,7 +20,7 @@ WebUI (webui/citybuilder-planner.html)  ──city.json──▶  サーバー (
 |---|---|
 | `mod/` | Fabric 1.19.2 Mod のソース一式(Gradleプロジェクト) |
 | `server-data/citybuilder/` | 建物テンプレート `templates/*.schem`(42個)、`catalog.json`、サンプル `plans/city01.json` |
-| `webui/citybuilder-planner.html` | 都市計画エディタ(単体HTML。ブラウザで開くだけ) |
+| `index.html` | 都市計画エディタ(単体HTML。ブラウザで開くだけ) |
 | `tools/` | テンプレート生成スクリプト(Node.js)。建物の調整・追加用 |
 
 ## 重要: このソースは未コンパイルです
@@ -85,7 +85,7 @@ gradle wrapper --gradle-version 7.6   # 初回のみ
 大きな作業は tick ごとに分割して実行されるので、サーバーは止まりません(`blocksPerTick`)。
 
 ### WebUI(都市計画)
-`webui/citybuilder-planner.html` をブラウザで開きます。
+`index.html` をブラウザで開きます。
 1. 左のパレットから建物を選んで配置(R で回転)。道路(L)・区画(A)ツールで道路網と緑地を描く
 2. 建物同士の重なり・道路との干渉は赤枠と警告で表示
 3. 「city.json をダウンロード」→ `config/citybuilder/plans/<名前>.json` に置く
@@ -129,7 +129,7 @@ gradle wrapper --gradle-version 7.6   # 初回のみ
 
 ## 仕様と制限(正直なところ)
 - **プレビューはブロックそのものではなく、半透明のボリューム+枠線です**。設計どおり、クライアントは建物のブロックデータを持たないためです。建物の見た目の確認は WebUI(真上のサムネイル)と、置いた後の `undo` で行います
-- 道路の幅は**奇数**で左右対称になります(WebUIは奇数のみ)。歩道は両側に幅2。中央線は幅5以上
+- 道路の幅は**3〜31ブロック**で指定でき、奇数だと左右対称になります。WebUIでは、道路ツール選択中にキャンバス左上のバーで変更します。歩道は両側に幅2。中央線は幅5以上
 - 鉄道(レール)の敷設は未対応です。駅舎・ホームはテンプレートとして置けます
 - 建物のブロックエンティティ(チェスト等)は復元しません(同梱の建物には含まれません)
 - undo は変更前のブロック状態を戻します。サーバー再起動で履歴は消えます

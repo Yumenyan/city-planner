@@ -95,7 +95,7 @@ public final class CityCommands {
                 .then(CommandManager.argument("from", BlockPosArgumentType.blockPos())
                         .then(CommandManager.argument("to", BlockPosArgumentType.blockPos())
                                 .executes(ctx -> road(ctx, 7, "asphalt"))
-                                .then(CommandManager.argument("width", IntegerArgumentType.integer(1, 31))
+                                .then(CommandManager.argument("width", IntegerArgumentType.integer(3, 31))
                                         .executes(ctx -> road(ctx, IntegerArgumentType.getInteger(ctx, "width"), "asphalt"))
                                         .then(CommandManager.argument("style", StringArgumentType.word())
                                                 .suggests((c, b) -> CommandSource.suggestMatching(jp.citybuilder.job.Styles.ROADS.keySet(), b))

@@ -65,6 +65,13 @@ code,.cmd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
 .crow{border:1px solid var(--line);border-radius:6px;padding:6px;margin:6px 0;background:var(--panel2)}
 .crow .row{margin:3px 0}.crow .row label{width:52px}
 .crow .h{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--dim)}
+#roadBar{position:absolute;left:10px;top:44px;display:none;align-items:center;gap:6px;flex-wrap:wrap;background:#101318ee;border:1px solid var(--acc);border-radius:8px;padding:6px 10px;max-width:calc(100% - 20px)}
+#roadBar.on{display:flex}
+#roadBar b{font-size:13px}
+#roadBar input[type=number]{width:62px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:3px 6px;text-align:center}
+#roadBar select{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
+#roadBar .pw{padding:2px 8px;font-size:12px}
+#roadBar .pw.on{background:var(--acc);color:#04121f;border-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -99,6 +106,15 @@ code,.cmd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
   <div id="stage">
     <canvas id="cv"></canvas>
     <div id="hint"></div>
+    <div id="roadBar">
+      <b>道路の幅</b>
+      <button class="btn pw" id="rbMinus">−</button><input type="number" id="rbW" min="3" max="31" step="1"><button class="btn pw" id="rbPlus">＋</button>
+      <span id="rbPresets"></span>
+      <span class="note">ブロック(最小3)</span>
+      <select id="rbStyle"></select><select id="rbLines"></select>
+      <label class="note"><input type="checkbox" id="rbWalk"> 歩道</label>
+      <span class="note" id="rbOdd"></span>
+    </div>
     <div id="toast"></div>
     <div id="dropOv" style="display:none;position:absolute;inset:0;background:#4da3ff33;border:3px dashed var(--acc);align-items:center;justify-content:center;font-size:20px;pointer-events:none">.schem をここにドロップ</div>
   </div>
@@ -151,6 +167,8 @@ const ROAD_STYLES = {
 };
 const LINE_NAMES = {none:'なし',dashed:'破線',solid:'実線',double:'二重線'};
 const ODD_WIDTHS = [3,5,7,9,11,13,15,17,21];
+const MIN_ROAD_W = 3, MAX_ROAD_W = 31;
+const clampW = v => clamp(Math.round(+v||7), MIN_ROAD_W, MAX_ROAD_W);
 
 /* ---------------- 状態 ---------------- */
 let CAT = {};          // id -> entry
@@ -434,9 +452,10 @@ function pickRoadPoint(sel,px,py){
 /* ---------------- ツール ---------------- */
 function setTool(t){
   S.tool=t; S.draft=null;
+  if (t!=='select') S.sel=null; // 道路・区画ツールの設定が右パネルに出るよう、選択を外す
   document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));
   cv.style.cursor=t==='select'?'default':'crosshair';
-  renderInspector(); draw();
+  renderInspector(); syncRoadBar(); draw();
 }
 $('tools').addEventListener('click',e=>{const b=e.target.closest('.tool');if(b)setTool(b.dataset.tool);});
 function finishRoad(){
@@ -444,11 +463,32 @@ function finishRoad(){
   addItem({type:'road',points:d.points.map(p=>p.slice()),width:S.roadOpt.width,sidewalk:S.roadOpt.sidewalk,style:S.roadOpt.style,lines:S.roadOpt.lines});
   S.draft=null; draw();
 }
+
+/* ---- 道路ツールの設定バー(キャンバス左上) ---- */
+function syncRoadBar(){
+  const bar=$('roadBar'), on=S.tool==='road';
+  bar.classList.toggle('on',on); if(!on) return;
+  const o=S.roadOpt;
+  $('rbW').value=o.width;
+  $('rbPresets').innerHTML=[3,5,7,9,11,13].map(w=>`<button class="btn pw${w===o.width?' on':''}" data-w="${w}">${w}</button>`).join('');
+  $('rbStyle').innerHTML=Object.keys(ROAD_STYLES).map(k=>`<option value="${k}" ${o.style===k?'selected':''}>${ROAD_STYLES[k].name}</option>`).join('');
+  $('rbLines').innerHTML=Object.keys(LINE_NAMES).map(k=>`<option value="${k}" ${o.lines===k?'selected':''}>中央線:${LINE_NAMES[k]}</option>`).join('');
+  $('rbWalk').checked=o.sidewalk;
+  $('rbOdd').textContent=o.width%2===0?'※偶数幅は左右非対称になります(奇数推奨)':'';
+}
+function setRoadWidth(w){S.roadOpt.width=clampW(w);syncRoadBar();renderInspector();draw();}
+$('rbMinus').onclick=()=>setRoadWidth(S.roadOpt.width-1);
+$('rbPlus').onclick=()=>setRoadWidth(S.roadOpt.width+1);
+$('rbW').addEventListener('change',e=>setRoadWidth(e.target.value));
+$('rbPresets').addEventListener('click',e=>{const b=e.target.closest('[data-w]');if(b)setRoadWidth(+b.dataset.w);});
+$('rbStyle').onchange=e=>{S.roadOpt.style=e.target.value;renderInspector();draw();};
+$('rbLines').onchange=e=>{S.roadOpt.lines=e.target.value;renderInspector();draw();};
+$('rbWalk').onchange=e=>{S.roadOpt.sidewalk=e.target.checked;renderInspector();draw();};
 function updateHint(){
   let h='';
   if (S.tool==='select') h='クリックで選択、ドラッグで移動(道路は点をドラッグで変形)。空き地ドラッグで画面移動。';
   else if (S.tool==='building') h=S.pal.pick?`「${CAT[S.pal.pick].name}」を配置:クリックで置く / R:回転 / 右クリック・Esc:終了`:'左のパレットから建物を選んでください。';
-  else if (S.tool==='road') h=S.draft?'クリックで点を追加 / ダブルクリック・Enter・右クリックで確定 / Shift:直角 / Esc:取消':'道路の始点をクリック(幅・路面は右のパネル)。';
+  else if (S.tool==='road') h=S.draft?'クリックで点を追加 / ダブルクリック・Enter・右クリックで確定 / Shift:直角 / Esc:取消':'道路の始点をクリック(幅・路面は左上のバーで変更)。';
   else if (S.tool==='area') h=S.draft?'もう一方の角をクリック / Esc:取消':'区画の角をクリック → 反対の角をクリック(ドラッグでも可)。';
   $('hint').textContent=h;
 }
@@ -624,16 +664,16 @@ function renderInspector(soft){
 function roadOptHtml(title){
   const o=S.roadOpt;
   return `<h2>${title}</h2>
-  <div class="row"><label>幅</label><select id="oW">${ODD_WIDTHS.map(w=>`<option ${w===o.width?'selected':''}>${w}</option>`).join('')}</select></div>
+  <div class="row"><label>幅</label><input type="number" id="oW" min="3" max="31" step="1" value="${o.width}"></div>
   <div class="row"><label>路面</label><select id="oS">${Object.keys(ROAD_STYLES).map(k=>`<option value="${k}" ${o.style===k?'selected':''}>${ROAD_STYLES[k].name}</option>`).join('')}</select></div>
   <div class="row"><label>中央線</label><select id="oL">${Object.keys(LINE_NAMES).map(k=>`<option value="${k}" ${o.lines===k?'selected':''}>${LINE_NAMES[k]}</option>`).join('')}</select></div>
   <div class="row"><label>歩道</label><input type="checkbox" id="oSW" ${o.sidewalk?'checked':''}> <span class="note">両側に幅${SIDEWALK_W}</span></div>
-  <div class="note">幅は奇数にすると左右対称になります。中央線は幅5以上で描かれます。</div>`;
+  <div class="note">幅は3〜31(奇数だと左右対称)。中央線は幅5以上で描かれます。</div>`;
 }
 function roadEditHtml(s){
-  const w=ODD_WIDTHS.includes(s.width)?ODD_WIDTHS:[...ODD_WIDTHS,s.width].sort((a,b)=>a-b);
   return `<h2>道路</h2>
-  <div class="row"><label>幅</label><select id="eW">${w.map(x=>`<option ${x===s.width?'selected':''}>${x}</option>`).join('')}</select></div>
+  <div class="row"><label>幅</label><input type="number" id="eW" min="3" max="31" step="1" value="${s.width}"></div>
+  <div class="btns" style="margin-top:0">${[3,5,7,9,11,13].map(x=>`<button class="btn pw" data-ew="${x}" style="padding:2px 8px">${x}</button>`).join('')}</div>
   <div class="row"><label>路面</label><select id="eS">${Object.keys(ROAD_STYLES).map(k=>`<option value="${k}" ${s.style===k?'selected':''}>${ROAD_STYLES[k].name}</option>`).join('')}</select></div>
   <div class="row"><label>中央線</label><select id="eL">${Object.keys(LINE_NAMES).map(k=>`<option value="${k}" ${s.lines===k?'selected':''}>${LINE_NAMES[k]}</option>`).join('')}</select></div>
   <div class="row"><label>歩道</label><input type="checkbox" id="eSW" ${s.sidewalk?'checked':''}></div>
@@ -647,7 +687,7 @@ function areaOptHtml(){
 }
 function bindInspector(s){
   const on=(id,ev,fn)=>{const e=$(id);if(e)e.addEventListener(ev,fn);};
-  on('oW','change',e=>{S.roadOpt.width=+e.target.value;draw();});
+  on('oW','change',e=>setRoadWidth(e.target.value));
   on('oS','change',e=>{S.roadOpt.style=e.target.value;draw();});
   on('oL','change',e=>{S.roadOpt.lines=e.target.value;draw();});
   on('oSW','change',e=>{S.roadOpt.sidewalk=e.target.checked;draw();});
@@ -659,7 +699,8 @@ function bindInspector(s){
   on('iTpl','change',e=>{pushHist();s.template=e.target.value;renderInspector();draw();});
   on('iR','click',()=>rotateSel(1));
   on('iDup','click',dupSel); on('iDel','click',delSel);
-  on('eW','change',e=>{pushHist();s.width=+e.target.value;draw();});
+  on('eW','change',e=>{pushHist();s.width=clampW(e.target.value);renderInspector();draw();});
+  document.querySelectorAll('#insp [data-ew]').forEach(b=>b.addEventListener('click',()=>{pushHist();s.width=+b.dataset.ew;renderInspector();draw();}));
   on('eS','change',e=>{pushHist();s.style=e.target.value;draw();});
   on('eL','change',e=>{pushHist();s.lines=e.target.value;draw();});
   on('eSW','change',e=>{pushHist();s.sidewalk=e.target.checked;draw();});
@@ -687,7 +728,7 @@ function importPlan(obj){
       } else if (o.type==='road'){
         const pts=o.points.map(p=>Array.isArray(p)?[Math.round(p[0]),Math.round(p[1])]:[Math.round(p.x),Math.round(p.z)]);
         if (pts.length<2) throw 0;
-        items.push({type:'road',points:pts,width:clamp(Math.round(o.width||7),1,31),sidewalk:o.sidewalk!==false,style:ROAD_STYLES[o.style]?o.style:'asphalt',lines:LINE_NAMES[o.lines]?o.lines:'dashed'});
+        items.push({type:'road',points:pts,width:clampW(o.width),sidewalk:o.sidewalk!==false,style:ROAD_STYLES[o.style]?o.style:'asphalt',lines:LINE_NAMES[o.lines]?o.lines:'dashed'});
       } else if (o.type==='area'){
         items.push({type:'area',x1:Math.round(o.x1),z1:Math.round(o.z1),x2:Math.round(o.x2),z2:Math.round(o.z2),style:String(o.block||o.style||'grass')});
       } else skipped++;

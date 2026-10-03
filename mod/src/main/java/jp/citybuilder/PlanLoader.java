@@ -133,7 +133,7 @@ public final class PlanLoader {
                         Styles.Road style = Styles.road(str(o, "style", "asphalt"));
                         String lines = str(o, "lines", "dashed");
                         if (style == null) { err = "不明な道路スタイル"; break; }
-                        if (width < 1 || width > 31) { err = "幅が不正です"; break; }
+                        if (width < 3 || width > 31) { err = "幅は3〜31にしてください"; break; }
                         if (!List.of("none", "dashed", "solid", "double").contains(lines)) { err = "不明な線スタイル"; break; }
                         int[] b = RoadJob.bounds(px, pz, width, sw);
                         err = PlacementValidator.checkBox(w, null, b[0], y, b[1], b[2], y, b[3]);

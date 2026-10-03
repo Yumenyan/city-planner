@@ -23,6 +23,7 @@ public final class RoadJob extends Job {
     private final int minX, maxX, minZ, maxZ;
     private final double[] cum;
     private int cx, cz;
+    private double nx, nz; // 直近の classify で最寄りだった線分の単位法線
 
     public RoadJob(UUID owner, ServerWorld world, int[] px, int[] pz, int width, boolean sidewalk,
                    Styles.Road style, String lines, int y, int clearAbove, boolean foundation, int foundDepth) {
@@ -66,6 +67,7 @@ public final class RoadJob extends Job {
 
     private int classify(int x, int z) {
         double best = Double.MAX_VALUE, along = 0;
+        nx = 0; nz = 0;
         if (px.length == 1) {
             best = Math.hypot(x - px[0], z - pz[0]);
         } else {
@@ -75,7 +77,11 @@ public final class RoadJob extends Job {
                 double t = len2 == 0 ? 0 : ((x - ax) * dx + (z - az) * dz) / len2;
                 t = Math.max(0, Math.min(1, t));
                 double d = Math.hypot(x - (ax + t * dx), z - (az + t * dz));
-                if (d < best) { best = d; along = cum[i] + t * Math.sqrt(len2); }
+                if (d < best) {
+                    best = d; along = cum[i] + t * Math.sqrt(len2);
+                    double len = Math.sqrt(len2);
+                    if (len > 0) { nx = -dz / len; nz = dx / len; }
+                }
             }
         }
         if (best <= halfW + 1e-6) {
@@ -97,6 +103,21 @@ public final class RoadJob extends Job {
         return NONE;
     }
 
+    /**
+     * 交差判定: この道路の両脇(歩道の外側)に別の道路の路面があれば、他の道路と交わっているとみなす。
+     * 既存の道路ブロックの上に引き直した場合など、交差していないときは中央線を消さない。
+     */
+    private boolean crossing(int x, int z) {
+        if (nx == 0 && nz == 0) return false;
+        double d = halfW + (sidewalk ? SIDEWALK_W : 0) + 1.5;
+        for (int s = -1; s <= 1; s += 2) {
+            int qx = (int) Math.round(x + s * nx * d);
+            int qz = (int) Math.round(z + s * nz * d);
+            if (Styles.isRoadBlock(get(qx, y, qz))) return true;
+        }
+        return false;
+    }
+
     @Override
     public int step(int budget) {
         int used = 0;
@@ -109,8 +130,8 @@ public final class RoadJob extends Job {
                 boolean existingRoad = Styles.isRoadBlock(cur);
                 BlockState place = null;
                 if (code == SURFACE) place = style.surface;
-                else if (code == WHITE) place = existingRoad ? style.surface : style.white;
-                else if (code == YELLOW) place = existingRoad ? style.surface : style.yellow;
+                else if (code == WHITE) place = (existingRoad && crossing(cx, cz)) ? style.surface : style.white;
+                else if (code == YELLOW) place = (existingRoad && crossing(cx, cz)) ? style.surface : style.yellow;
                 else if (code == WALK && !existingRoad) place = style.sidewalk;
                 if (place != null) {
                     used += put(cx, y, cz, place);

@@ -42,7 +42,7 @@ public final class CityActions {
         Styles.Road style = Styles.road(styleName);
         if (style == null) return "不明な道路スタイル: " + styleName;
         if (px.length < 2 || px.length > 256) return "道路の点は2〜256個にしてください";
-        if (width < 1 || width > 31) return "幅は1〜31にしてください";
+        if (width < 3 || width > 31) return "幅は3〜31にしてください";
         if (lines == null) lines = "dashed";
         if (!List.of("none", "dashed", "solid", "double").contains(lines)) return "不明な線スタイル: " + lines;
         CityConfig c = CityBuilderMod.config();
