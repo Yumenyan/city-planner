@@ -47,15 +47,9 @@ public final class PreviewRenderer {
         }
     }
 
-    private static void render(WorldRenderContext ctx) {
-        if (!PlacementMode.active()) return;
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.player == null) return;
+    private static void addPlacement(List<Box> boxes, List<Line> lines) {
         boolean ok = ClientCatalog.canBuild;
         float cr = ok ? 0.2f : 1.0f, cg = ok ? 0.9f : 0.2f, cb = ok ? 0.4f : 0.2f;
-
-        List<Box> boxes = new ArrayList<>();
-        List<Line> lines = new ArrayList<>();
         BlockPos t = PlacementMode.target;
 
         switch (PlacementMode.kind) {
@@ -115,6 +109,46 @@ public final class PreviewRenderer {
             default:
                 return;
         }
+    }
+
+    /** /citybuilder plan load で出したプレビュー(建物=青、道路=白、区画=緑、全体の範囲=黄) */
+    private static void addPlan(List<Box> boxes, List<Line> lines) {
+        for (int[] s : PlanPreview.shapes) {
+            switch (s[0]) {
+                case 0: boxes.add(new Box(s[1], s[2], s[3], s[4] + 1, s[5] + 1, s[6] + 1, 0.3f, 0.7f, 1.0f, 0.12f)); break;
+                case 1: boxes.add(new Box(s[1], s[2], s[3], s[4] + 1, s[5] + 1, s[6] + 1, 0.95f, 0.95f, 0.95f, 0.15f)); break;
+                default: boxes.add(new Box(s[1], s[2], s[3], s[4] + 1, s[5] + 1, s[6] + 1, 0.4f, 1.0f, 0.4f, 0.15f));
+            }
+        }
+        int[] b = PlanPreview.bounds;
+        if (b != null) {
+            double y = PlanPreview.baseY + 0.05, top = y + 40;
+            double x1 = b[0], z1 = b[1], x2 = b[2] + 1, z2 = b[3] + 1;
+            lines.add(new Line(x1, y, z1, x2, y, z1, 1f, 0.85f, 0.1f));
+            lines.add(new Line(x2, y, z1, x2, y, z2, 1f, 0.85f, 0.1f));
+            lines.add(new Line(x2, y, z2, x1, y, z2, 1f, 0.85f, 0.1f));
+            lines.add(new Line(x1, y, z2, x1, y, z1, 1f, 0.85f, 0.1f));
+            lines.add(new Line(x1, y, z1, x1, top, z1, 1f, 0.85f, 0.1f));
+            lines.add(new Line(x2, y, z1, x2, top, z1, 1f, 0.85f, 0.1f));
+            lines.add(new Line(x2, y, z2, x2, top, z2, 1f, 0.85f, 0.1f));
+            lines.add(new Line(x1, y, z2, x1, top, z2, 1f, 0.85f, 0.1f));
+        }
+        BlockPos o = PlanPreview.origin;
+        if (o != null) { // 原点マーカー(赤い十字)
+            double y = o.getY() + 1.1;
+            lines.add(new Line(o.getX() - 2, y, o.getZ() + 0.5, o.getX() + 3, y, o.getZ() + 0.5, 1f, 0.2f, 0.2f));
+            lines.add(new Line(o.getX() + 0.5, y, o.getZ() - 2, o.getX() + 0.5, y, o.getZ() + 3, 1f, 0.2f, 0.2f));
+        }
+    }
+
+    private static void render(WorldRenderContext ctx) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player == null) return;
+        List<Box> boxes = new ArrayList<>();
+        List<Line> lines = new ArrayList<>();
+        if (PlanPreview.active()) addPlan(boxes, lines);
+        if (PlacementMode.active()) addPlacement(boxes, lines);
+        if (boxes.isEmpty() && lines.isEmpty()) return;
 
         MatrixStack ms = ctx.matrixStack();
         Vec3d cam = ctx.camera().getPos();

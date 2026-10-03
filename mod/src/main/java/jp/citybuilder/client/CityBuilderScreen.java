@@ -56,6 +56,7 @@ public final class CityBuilderScreen extends Screen {
         tabButton(left + 64, "道路", 1);
         tabButton(left + 128, "区画", 2);
 
+        addDrawableChild(new ButtonWidget(left + 192, 22, 80, 20, Text.literal("アップロード"), b -> client.setScreen(new UploadScreen(this))));
         addDrawableChild(new ButtonWidget(width - 110, 22, 100, 20, Text.literal("元に戻す(undo)"), b ->
                 ClientPlayNetworking.send(NetIds.UNDO, PacketByteBufs.create())));
         addDrawableChild(new ButtonWidget(width - 220, 22, 100, 20, Text.literal("カタログ更新"), b ->
@@ -92,10 +93,13 @@ public final class CityBuilderScreen extends Screen {
             shown.add(e);
             rects.add(new int[]{130, ly, 250, 20});
             String label = e.name + "  (" + e.w + "×" + e.l + ")";
-            addDrawableChild(new ButtonWidget(130, ly, 250, 20, Text.literal(label), b -> {
+            addDrawableChild(new ButtonWidget(130, ly, 206, 20, Text.literal(label), b -> {
                 PlacementMode.startBuilding(e);
                 close();
             }));
+            boolean custom = !PlacementMode.materialsFor(e.id).isEmpty();
+            addDrawableChild(new ButtonWidget(338, ly, 42, 20, Text.literal(custom ? "§e建材" : "建材"), b ->
+                    client.setScreen(new MaterialScreen(this, e))));
             ly += 22;
         }
         if (pages > 1) {

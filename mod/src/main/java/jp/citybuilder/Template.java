@@ -10,11 +10,19 @@ import net.minecraft.util.BlockRotation;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.registry.Registry;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.zip.GZIPInputStream;
 
 /**
  * Sponge Schematic (v2 / v3) の読み込み。
@@ -52,6 +60,38 @@ public final class Template {
         return r;
     }
 
+    /** 建材を置き換えた回転後パレット。map が空なら通常のパレット。 */
+    public BlockState[] palette(int rot, Map<Block, Block> map) {
+        BlockState[] base = palette(rot);
+        if (map == null || map.isEmpty()) return base;
+        BlockState[] r = new BlockState[base.length];
+        for (int i = 0; i < r.length; i++) {
+            Block to = map.get(base[i].getBlock());
+            r[i] = to == null ? base[i] : Materials.replace(base[i], to);
+        }
+        return r;
+    }
+
+    private List<Map.Entry<String, Integer>> materialCache;
+
+    /** 使われているブロックの種類と個数(多い順、空気を除く)。最大 limit 件。 */
+    public synchronized List<Map.Entry<String, Integer>> materials(int limit) {
+        if (materialCache == null) {
+            int[] cnt = new int[palette.length];
+            for (int v : data) cnt[v]++;
+            Map<String, Integer> m = new HashMap<>();
+            for (int i = 0; i < palette.length; i++) {
+                if (cnt[i] == 0 || palette[i].isAir()) continue;
+                String k = Registry.BLOCK.getId(palette[i].getBlock()).toString();
+                m.merge(k, cnt[i], Integer::sum);
+            }
+            List<Map.Entry<String, Integer>> l = new ArrayList<>(m.entrySet());
+            l.sort((a, b) -> b.getValue() != a.getValue().intValue() ? b.getValue() - a.getValue() : a.getKey().compareTo(b.getKey()));
+            materialCache = l;
+        }
+        return materialCache.size() <= limit ? materialCache : materialCache.subList(0, limit);
+    }
+
     public int paletteIndexAt(int idx) { return data[idx]; }
 
     /** 元座標(x,z)を回転後の相対座標へ(時計回り90度×rot)。結果は {nx, nz}。 */
@@ -64,10 +104,26 @@ public final class Template {
         }
     }
 
+    /** 展開後サイズの上限(zip爆弾対策) */
+    private static final int MAX_UNZIPPED = 64 * 1024 * 1024;
+
     public static Template load(String id, Path file) throws IOException {
+        if (Files.size(file) > 32L * 1024 * 1024) throw new IOException("ファイルが大きすぎます");
+        return load(id, Files.readAllBytes(file));
+    }
+
+    /** gzip圧縮された .schem のバイト列から読み込む。展開サイズを制限する。 */
+    public static Template load(String id, byte[] gz) throws IOException {
         NbtCompound root;
-        try (InputStream in = Files.newInputStream(file)) {
-            root = NbtIo.readCompressed(in);
+        try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(gz))) {
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                if (bo.size() + n > MAX_UNZIPPED) throw new IOException("展開後のサイズが大きすぎます");
+                bo.write(buf, 0, n);
+            }
+            root = NbtIo.read(new DataInputStream(new ByteArrayInputStream(bo.toByteArray())));
         }
         if (root.contains("Schematic", 10)) root = root.getCompound("Schematic");
         int w = root.getShort("Width") & 0xFFFF;
@@ -84,8 +140,10 @@ public final class Template {
             bytes = root.getByteArray("BlockData");
         }
         if (w <= 0 || h <= 0 || l <= 0) throw new IOException("サイズが不正です");
+        if (w > 512 || h > 384 || l > 512) throw new IOException("サイズが大きすぎます");
         int max = -1;
         for (String k : pc.getKeys()) max = Math.max(max, pc.getInt(k));
+        if (max > 65535) throw new IOException("パレットが大きすぎます");
         BlockState[] palette = new BlockState[max + 1];
         for (String k : pc.getKeys()) palette[pc.getInt(k)] = parseState(k);
         for (int i = 0; i < palette.length; i++) if (palette[i] == null) palette[i] = Blocks.AIR.getDefaultState();

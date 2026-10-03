@@ -62,6 +62,10 @@ code,.cmd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
   footer{grid-column:1;grid-row:5}
 }
 #dropOv.on{display:flex!important}
+.mrow{display:flex;align-items:center;gap:4px;margin:3px 0;font-size:12px}
+.mrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow input{width:96px}
+.sw{display:inline-block;width:12px;height:12px;border:1px solid #0008;border-radius:2px;flex:none}
 .crow{border:1px solid var(--line);border-radius:6px;padding:6px;margin:6px 0;background:var(--panel2)}
 .crow .row{margin:3px 0}.crow .row label{width:52px}
 .crow .h{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--dim)}
@@ -131,13 +135,13 @@ code,.cmd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
     </div>
     <input type="file" id="fImport" accept=".json,application/json" hidden>
     <h2>Minecraftへの反映手順</h2>
-    <div class="note">1. ダウンロードしたファイルをサーバーの<br><code>config/citybuilder/plans/<span id="pn1">city01</span>.json</code> に置く<br>2. 原点にしたい地表ブロックの上に立ち、実行:</div>
+    <div class="note">1. ダウンロードしたファイルをサーバーの<br><code>config/citybuilder/plans/<span id="pn1">city01</span>.json</code> に置く<br>2. 原点にしたい地表ブロックの上に立ち、実行すると<b>範囲のプレビュー</b>(黄色の枠)が出ます:</div>
     <code class="cmd" id="cmd1"></code>
     <div class="note">座標を指定する場合(原点=地表ブロック):</div>
     <code class="cmd" id="cmd2"></code>
-    <div class="note">うまくいかなければ <code>/citybuilder undo</code> で一括して戻せます。</div>
+    <div class="note">位置を確認して <code>/citybuilder plan confirm</code>(またはチャットの[確定して建築])で建築開始。やめるときは <code>plan cancel</code>。建築後も <code>/citybuilder undo</code> で一括して戻せます。</div>
     <h2>自作の建物</h2>
-    <div class="note" id="customNote">.schem を画面にドラッグ&ドロップ(複数可)すると、寸法と真上の見た目を自動で読み取って「自作」カテゴリに追加します。</div>
+    <div class="note" id="customNote">.schem を画面にドラッグ&ドロップ(複数可)すると、寸法と真上の見た目、使われている建材を自動で読み取って「自作」カテゴリに追加します。ゲーム内のアップロード画面からサーバーへ送ることもできます。</div>
     <div id="customList"></div>
     <h2>カタログ</h2>
     <div class="note" id="catInfo"></div>
@@ -175,6 +179,7 @@ let CAT = {};          // id -> entry
 let BASE = null, BASE_LABEL = '内蔵カタログ', CUSTOM = []; // BASE=内蔵/読み込んだカタログ, CUSTOM=取り込んだ.schem
 let thumbs = {};       // id -> canvas
 const S = {
+  matPick: {},
   items: [], nextId: 1, sel: null,
   tool: 'select', grid: 1,
   view: {x: 0, z: 0, s: 5},      // 画面中心のワールド座標と 1ブロックのpx
@@ -197,7 +202,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 
 /* ---------------- カタログ ---------------- */
 function setCatalog(data, label){
-  CAT = {}; thumbs = {};
+  CAT = {}; thumbs = {}; for (const k in thumbCache) delete thumbCache[k];
   for (const b of data.buildings) {
     if (!b || !b.id || !Array.isArray(b.size)) continue;
     CAT[b.id] = b;
@@ -209,7 +214,14 @@ function setCatalog(data, label){
   $('catInfo').textContent = `${label}: ${Object.keys(CAT).length} 件 / カテゴリ ${cats.length}`;
   buildChips(cats); buildList(); draw();
 }
-function makeThumb(b){
+const thumbCache={};
+function thumbFor(it){
+  const b=CAT[it.template]; if(!b) return null;
+  const m=it.mat; if(!m||!b.bk||!Object.keys(m).length) return thumbs[b.id];
+  const k=b.id+'|'+JSON.stringify(m);
+  return thumbCache[k]||(thumbCache[k]=makeThumb(b,m));
+}
+function makeThumb(b,mat){
   const w=b.size[0], l=b.size[2];
   const c=document.createElement('canvas'); c.width=w; c.height=l;
   const g=c.getContext('2d');
@@ -217,7 +229,9 @@ function makeThumb(b){
     const rows=b.top.split('/');
     for (let z=0; z<rows.length; z++) for (let x=0; x<rows[z].length; x++) {
       const ch=rows[z][x]; if (ch==='.') continue;
-      g.fillStyle=b.pal[ch]||'#f0f'; g.fillRect(x,z,1,1);
+      let col=b.pal[ch]||'#f0f';
+      if (mat&&b.bk&&mat[b.bk[ch]]) col=blockColor(mat[b.bk[ch]]);
+      g.fillStyle=col; g.fillRect(x,z,1,1);
     }
   } else {
     g.fillStyle='#667'; g.fillRect(0,0,w,l);
@@ -344,7 +358,7 @@ function drawRoad(it,pass){
   }
 }
 function drawBuilding(it,ghost,warn){
-  const f=footprint(it), t=thumbs[it.template], s=S.view.s;
+  const f=footprint(it), t=thumbFor(it), s=S.view.s;
   const [x,y]=w2s(f.x,f.z), pw=f.w*s, pl=f.l*s;
   g.save();
   if (ghost) g.globalAlpha=.7;
@@ -413,7 +427,9 @@ function draw(){
 function ghostItem(){
   const b=CAT[S.pal.pick]; const rot=S.rot&3;
   const w=(rot&1)?b.size[2]:b.size[0], l=(rot&1)?b.size[0]:b.size[2];
-  return {type:'building',template:b.id,rotation:rot,x:snap(S.mouse.x-Math.floor(w/2)),z:snap(S.mouse.z-Math.floor(l/2))};
+  const g={type:'building',template:b.id,rotation:rot,x:snap(S.mouse.x-Math.floor(w/2)),z:snap(S.mouse.z-Math.floor(l/2))};
+  const m=S.matPick[b.id]; if (m&&Object.keys(m).length) g.mat=Object.assign({},m);
+  return g;
 }
 function rbPoint(){
   const last=S.draft.points[S.draft.points.length-1];
@@ -546,7 +562,7 @@ cv.addEventListener('mousedown',e=>{
     renderInspector(); draw();
   } else if (S.tool==='building'){
     if (!S.pal.pick){toast('先に左のパレットから建物を選んでください');return;}
-    const gi=ghostItem(); addItem({type:'building',template:gi.template,x:gi.x,z:gi.z,rotation:gi.rotation});
+    const gi=ghostItem(); const ni={type:'building',template:gi.template,x:gi.x,z:gi.z,rotation:gi.rotation}; if (gi.mat) ni.mat=gi.mat; addItem(ni);
   } else if (S.tool==='road'){
     if (!S.draft) S.draft={type:'road',points:[]};
     const pt=rbPoint(); const last=S.draft.points[S.draft.points.length-1];
@@ -627,6 +643,29 @@ function dupSel(){
 function numRow(label,val,onch,step){
   return `<div class="row"><label>${label}</label><input type="number" data-k="${label}" value="${val}" step="${step||1}"></div>`;
 }
+const BLK_PRESETS=['white_concrete','light_gray_concrete','gray_concrete','black_concrete','brown_concrete','red_concrete','orange_concrete','yellow_concrete','lime_concrete','green_concrete','cyan_concrete','light_blue_concrete','blue_concrete','purple_concrete','magenta_concrete','pink_concrete','smooth_quartz','quartz_block','stone_bricks','bricks','smooth_sandstone','smooth_stone','polished_andesite','polished_diorite','white_terracotta','light_gray_terracotta','terracotta','red_terracotta','brown_terracotta','oak_planks','spruce_planks','birch_planks','dark_oak_planks','deepslate_tiles','polished_blackstone','iron_block','copper_block'];
+function matHtml(b,mat){
+  if (!b||!b.materials||!b.materials.length||!b.bk) return b&&b.custom?'<div class="note">この自作建物は建材の変更に未対応です(.schemを取り込み直すと対応します)</div>':'';
+  mat=mat||{};
+  let h='<h2 style="margin-top:10px">建材</h2><datalist id="blkList">'+BLK_PRESETS.map(n=>`<option value="${n}">`).join('')+'</datalist>';
+  for (const m of b.materials.slice(0,10)){
+    const nm=m.b.replace(/^minecraft:/,''), to=mat[nm]||'';
+    h+=`<div class="mrow"><span class="sw" style="background:${blockColor(nm)}"></span><span class="nm" title="${esc(nm)}">${esc(nm)} <span class="note">×${m.n}</span></span><span>→</span><input type="text" list="blkList" data-mf="${esc(nm)}" value="${esc(to)}" placeholder="そのまま"><span class="sw" style="background:${to?blockColor(to):'transparent'}"></span></div>`;
+  }
+  h+=`<div class="btns"><button class="btn" id="mReset">建材をリセット</button></div><div class="note">置き換え先のブロックIDを入力(例: light_gray_concrete)。向きは引き継がれます。チェスト等の特殊ブロックは不可。</div>`;
+  return h;
+}
+function bindMat(getMat,setMat,beforeChange){
+  document.querySelectorAll('#insp input[data-mf]').forEach(inp=>inp.addEventListener('change',()=>{
+    const from=inp.dataset.mf; let v=inp.value.trim().replace(/^minecraft:/,'').toLowerCase();
+    if (v&&!/^[a-z0-9_]+$/.test(v)){toast('ブロックIDは半角英小文字・数字・_ のみです');inp.value=(getMat()||{})[from]||'';return;}
+    if (beforeChange) beforeChange();
+    const m=Object.assign({},getMat()||{});
+    if (!v||v===from) delete m[from]; else m[from]=v;
+    setMat(m); renderInspector(); draw(); buildList();
+  }));
+  const r=$('mReset'); if (r) r.addEventListener('click',()=>{if(beforeChange)beforeChange();setMat({});renderInspector();draw();buildList();});
+}
 function renderInspector(soft){
   const el=$('insp'), s=getSel();
   if (soft && el.dataset.sel===String(S.sel) && s){ // ドラッグ中は値だけ更新
@@ -636,7 +675,7 @@ function renderInspector(soft){
   if (!s){
     if (S.tool==='road') h=roadOptHtml('道路の設定(新規)');
     else if (S.tool==='area') h=areaOptHtml();
-    else if (S.tool==='building'&&S.pal.pick){const b=CAT[S.pal.pick];h=`<h2>配置中</h2><div><b>${esc(b.name)}</b></div><div class="note">${esc(b.description||'')}</div><div class="note">寸法 ${b.size[0]}×${b.size[1]}×${b.size[2]}(幅×高さ×奥行) / 余白 ${marginOf(b.id)}</div><div class="btns"><button class="btn" id="iRotG">回転 (R)</button></div>`;}
+    else if (S.tool==='building'&&S.pal.pick){const b=CAT[S.pal.pick];h=`<h2>配置中</h2><div><b>${esc(b.name)}</b></div><div class="note">${esc(b.description||'')}</div><div class="note">寸法 ${b.size[0]}×${b.size[1]}×${b.size[2]}(幅×高さ×奥行) / 余白 ${marginOf(b.id)}</div><div class="btns"><button class="btn" id="iRotG">回転 (R)</button></div>${matHtml(b,S.matPick[b.id])}`;}
     else h='<h2>インスペクタ</h2><div class="note">何も選択されていません。<br>建物は左のパレットから選んで置き、道路・区画はツールを選んで描きます。</div>';
   } else if (s.type==='building'){
     const b=CAT[s.template], w=computeWarnings().get(s.id)||[];
@@ -648,7 +687,7 @@ function renderInspector(soft){
     <div class="row"><label>テンプレ</label><select id="iTpl">${Object.values(CAT).map(c=>`<option value="${esc(c.id)}" ${c.id===s.template?'selected':''}>${esc(c.category)}/${esc(c.name)}</option>`).join('')}</select></div>
     <div class="note">X,Z は回転後の敷地(余白込み)の北西の角です。</div>
     ${w.map(m=>`<div class="warn">⚠ ${esc(m)}</div>`).join('')}
-    <div class="btns"><button class="btn" id="iR">⟳ 回転</button><button class="btn" id="iDup">複製</button><button class="btn del" id="iDel">削除</button></div>`;
+    <div class="btns"><button class="btn" id="iR">⟳ 回転</button><button class="btn" id="iDup">複製</button><button class="btn del" id="iDel">削除</button></div>${matHtml(b,s.mat)}`;
   } else if (s.type==='road'){
     h=roadEditHtml(s);
   } else if (s.type==='area'){
@@ -693,10 +732,12 @@ function bindInspector(s){
   on('oSW','change',e=>{S.roadOpt.sidewalk=e.target.checked;draw();});
   on('aS','change',e=>{S.areaOpt.style=e.target.value;});
   on('iRotG','click',()=>{S.rot=(S.rot+1)&3;draw();});
+  if (!s&&S.tool==='building'&&S.pal.pick) bindMat(()=>S.matPick[S.pal.pick],m=>{S.matPick[S.pal.pick]=m;});
   if (!s) return;
+  if (s.type==='building') bindMat(()=>s.mat,m=>{if(Object.keys(m).length)s.mat=m;else delete s.mat;},pushHist);
   document.querySelectorAll('#insp input[data-f]').forEach(i=>i.addEventListener('change',()=>{pushHist();s[i.dataset.f]=Math.round(+i.value||0);renderInspector();draw();}));
   on('iRot','change',e=>{pushHist();const f=footprint(s),cx=f.x+f.w/2,cz=f.z+f.l/2;s.rotation=+e.target.value;const f2=footprint(s);s.x=Math.round(cx-f2.w/2);s.z=Math.round(cz-f2.l/2);renderInspector();draw();});
-  on('iTpl','change',e=>{pushHist();s.template=e.target.value;renderInspector();draw();});
+  on('iTpl','change',e=>{pushHist();s.template=e.target.value;delete s.mat;renderInspector();draw();});
   on('iR','click',()=>rotateSel(1));
   on('iDup','click',dupSel); on('iDel','click',delSel);
   on('eW','change',e=>{pushHist();s.width=clampW(e.target.value);renderInspector();draw();});
@@ -711,11 +752,15 @@ function bindInspector(s){
 function planName(){return ($('planName').value.trim().replace(/[^A-Za-z0-9_\-]/g,'_')||'city01');}
 function exportPlan(){
   const items=S.items.map(it=>{
-    if (it.type==='building') return {type:'building',template:it.template,x:it.x,z:it.z,rotation:it.rotation*90};
+    if (it.type==='building'){
+      const o={type:'building',template:it.template,x:it.x,z:it.z,rotation:it.rotation*90};
+      if (it.mat&&Object.keys(it.mat).length) o.materials=Object.assign({},it.mat);
+      return o;
+    }
     if (it.type==='road') return {type:'road',points:it.points.map(p=>[p[0],p[1]]),width:it.width,sidewalk:!!it.sidewalk,style:it.style,lines:it.lines};
     return {type:'area',x1:it.x1,z1:it.z1,x2:it.x2,z2:it.z2,style:it.style};
   });
-  return {name:planName(),version:1,items};
+  return {name:planName(),version:2,items};
 }
 function importPlan(obj){
   if (!obj||!Array.isArray(obj.items)) throw new Error('items がありません');
@@ -724,7 +769,12 @@ function importPlan(obj){
     try{
       if (o.type==='building'){
         let r=+o.rotation||0; if (r>=4) r=Math.round(r/90); r=((r%4)+4)%4;
-        items.push({type:'building',template:String(o.template),x:Math.round(o.x),z:Math.round(o.z),rotation:r});
+        const bi={type:'building',template:String(o.template),x:Math.round(o.x),z:Math.round(o.z),rotation:r};
+        if (o.materials&&typeof o.materials==='object'){
+          const m={}; for (const k in o.materials){const a=String(k).replace(/^minecraft:/,''),b=String(o.materials[k]).replace(/^minecraft:/,''); if (/^[a-z0-9_]+$/.test(a)&&/^[a-z0-9_]+$/.test(b)&&a!==b) m[a]=b;}
+          if (Object.keys(m).length) bi.mat=m;
+        }
+        items.push(bi);
       } else if (o.type==='road'){
         const pts=o.points.map(p=>Array.isArray(p)?[Math.round(p[0]),Math.round(p[1])]:[Math.round(p.x),Math.round(p.z)]);
         if (pts.length<2) throw 0;
@@ -869,21 +919,24 @@ async function readSchem(file){
   if (!w||!h||!l||!pal||!data) throw new Error('Sponge Schematic v2/v3 の形式ではありません(.schematic など古い形式は未対応です)');
   if (w*h*l>50e6) throw new Error('大きすぎます');
   const names=[]; let maxi=-1; for (const k in pal){names[pal[k]]=k;maxi=Math.max(maxi,pal[k]);}
-  const air=[],col=[];
-  for (let i=0;i<=maxi;i++){const nm=(names[i]||'air').replace(/^minecraft:/,'').replace(/\[.*$/,'');air[i]=AIRLIKE.has(nm);col[i]=blockColor(names[i]||'air');}
+  const air=[],col=[],nms=[];
+  for (let i=0;i<=maxi;i++){const nm=(names[i]||'air').replace(/^minecraft:/,'').replace(/\[.*$/,'');nms[i]=nm;air[i]=AIRLIKE.has(nm);col[i]=blockColor(names[i]||'air');}
   const total=w*h*l, idx=new Int32Array(total); let q=0;
   for (let i=0;i<total;i++){let v=0,sh=0;for(;;){if(q>=data.length)throw new Error('BlockData が途中で終わっています');const b=data[q++];v|=(b&0x7f)<<sh;if(!(b&0x80))break;sh+=7;}idx[i]=v;}
   // 真上から見た色
-  const chars={},pm={}; let rows=[];
+  const chars={},pm={},bk={}; let rows=[];
+  const cnt=new Map(); for (let i=0;i<total;i++){const v=idx[i]; if(!air[v]) cnt.set(v,(cnt.get(v)||0)+1);}
+  const matN={}; for (const [v,n] of cnt){const nm=nms[v]; matN[nm]=(matN[nm]||0)+n;}
+  const materials=Object.entries(matN).sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:1)).slice(0,16).map(([b,n])=>({b,n}));
   for (let z=0;z<l;z++){let r='';
     for (let x=0;x<w;x++){
       let c=null;
-      for (let y=h-1;y>=0;y--){const v=idx[(y*l+z)*w+x];if(!air[v]){c=col[v];break;}}
+      for (let y=h-1;y>=0;y--){const v=idx[(y*l+z)*w+x];if(!air[v]){c=nms[v];break;}}
       if (!c){r+='.';continue;}
-      if (!pm[c]){const ch=String.fromCharCode(0x100+Object.keys(pm).length);pm[c]=ch;chars[ch]=c;}
+      if (!pm[c]){const ch=String.fromCharCode(0x100+Object.keys(pm).length);pm[c]=ch;chars[ch]=blockColor(c);bk[ch]=c;}
       r+=pm[c];}
     rows.push(r);}
-  return {w,h,l,top:rows.join('/'),pal:chars};
+  return {w,h,l,top:rows.join('/'),pal:chars,bk,materials};
 }
 function saveCustom(){try{localStorage.setItem('citybuilder.custom',JSON.stringify(CUSTOM));}catch(e){}}
 function applyCatalog(){
@@ -901,7 +954,7 @@ async function importSchems(files){
       const raw=f.name.replace(/\.[^.]+$/,'');
       let id=raw.replace(/[^A-Za-z0-9_\-]+/g,'_').replace(/^_+|_+$/g,'');
       if (!id) id='custom_'+(CUSTOM.length+1);
-      const e={id,name:raw,category:'自作',size:[r.w,r.h,r.l],margin:0,floors:0,description:'取り込み: '+f.name,top:r.top,pal:r.pal,custom:true,file:f.name,idFixed:id!==raw};
+      const e={id,name:raw,category:'自作',size:[r.w,r.h,r.l],margin:0,floors:0,description:'取り込み: '+f.name,top:r.top,pal:r.pal,bk:r.bk,materials:r.materials,custom:true,file:f.name,idFixed:id!==raw};
       const old=CUSTOM.findIndex(c=>c.id===id);
       if (old>=0){e.name=CUSTOM[old].name;e.category=CUSTOM[old].category;e.margin=CUSTOM[old].margin;CUSTOM[old]=e;} else CUSTOM.push(e);
       ok++;

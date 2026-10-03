@@ -12,7 +12,9 @@ import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 
 import java.io.IOException;
@@ -25,7 +27,7 @@ import java.util.UUID;
 /**
  * /citybuilder reload | list [category] | info <id> | place <id> <pos> [rotation]
  *              | road <from> <to> [width] [style] | area <from> <to> <style>
- *              | undo | cancel | status | plan list | plan load <name> [origin]
+ *              | undo | cancel | status | plan list | plan load <name> [origin] (プレビュー) | plan confirm | plan cancel
  */
 public final class CityCommands {
     private CityCommands() {}
@@ -128,6 +130,12 @@ public final class CityCommands {
                     List<String> l = PlanLoader.list();
                     return ok(ctx.getSource(), l.isEmpty() ? "プランがありません (config/citybuilder/plans/*.json)" : "プラン: " + String.join(", ", l));
                 }))
+                .then(CommandManager.literal("confirm").executes(CityCommands::planConfirm))
+                .then(CommandManager.literal("cancel").executes(ctx -> {
+                    ServerCommandSource s = ctx.getSource();
+                    boolean had = PlanSessions.cancel(playerOf(s), ownerOf(s));
+                    return had ? ok(s, "プランのプレビューを取り消しました") : fail(s, "保留中のプランはありません");
+                }))
                 .then(CommandManager.literal("load")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                                 .suggests((c, b) -> CommandSource.suggestMatching(PlanLoader.list(), b))
@@ -196,10 +204,32 @@ public final class CityCommands {
         }
         String name = StringArgumentType.getString(ctx, "name");
         try {
-            PlanLoader.Result r = PlanLoader.load(s.getWorld(), p, name, origin);
+            PlanLoader.Prepared pr = PlanLoader.prepare(s.getWorld(), p, name, origin);
+            PlanLoader.Result r = pr.result;
             for (String e : r.errors) s.sendError(Text.literal("  スキップ " + e));
-            return ok(s, "プラン '" + name + "' を開始: " + r.accepted + " 件を受付 / " + r.skipped + " 件をスキップ (約 "
-                    + r.estimate + " ブロック, 原点 " + origin.toShortString() + ")");
+            if (pr.jobs.isEmpty()) return fail(s, "実行できる項目がありません (" + r.skipped + " 件をスキップ)");
+            PlanSessions.put(p, pr);
+            String range = r.bounds == null ? "" : " / 範囲 X " + r.bounds[0] + "〜" + r.bounds[2] + ", Z " + r.bounds[1] + "〜" + r.bounds[3]
+                    + " (" + (r.bounds[2] - r.bounds[0] + 1) + "x" + (r.bounds[3] - r.bounds[1] + 1) + ")";
+            s.sendFeedback(Text.literal("プラン '" + name + "' のプレビュー: 建物 " + r.buildings + " / 道路 " + r.roads + " / 区画 " + r.areas
+                    + " (スキップ " + r.skipped + ") / 約 " + r.estimate + " ブロック / 原点 " + origin.toShortString() + range), false);
+            Text confirm = Text.literal("[確定して建築]").styled(st -> st.withColor(Formatting.GREEN).withBold(true)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citybuilder plan confirm")));
+            Text cancel = Text.literal("[取り消し]").styled(st -> st.withColor(Formatting.RED)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citybuilder plan cancel")));
+            s.sendFeedback(Text.literal("黄色の枠が街の範囲です(青=建物 白=道路 緑=区画)。 ").append(confirm).append(Text.literal(" ")).append(cancel)
+                    .append(Text.literal(" ※3分で期限切れ")), false);
+            return 1;
+        } catch (IOException e) {
+            return fail(s, e.getMessage());
+        }
+    }
+
+    private static int planConfirm(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource s = ctx.getSource();
+        try {
+            PlanLoader.Prepared pr = PlanSessions.confirm(playerOf(s), ownerOf(s), s.getServer().getTicks());
+            return ok(s, "プラン '" + pr.name + "' を開始: 約 " + pr.result.estimate + " ブロック (/citybuilder undo で一括して戻せます)");
         } catch (IOException e) {
             return fail(s, e.getMessage());
         }

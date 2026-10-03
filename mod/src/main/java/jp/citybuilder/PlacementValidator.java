@@ -22,6 +22,16 @@ public final class PlacementValidator {
         return false;
     }
 
+    /** .schem アップロードの権限 */
+    public static boolean canUpload(ServerPlayerEntity p) {
+        CityConfig c = CityBuilderMod.config();
+        if (!c.allowUpload || !canUse(p)) return false;
+        if (p.hasPermissionLevel(c.uploadPermissionLevel)) return true;
+        String name = p.getGameProfile().getName();
+        for (String s : c.allowedPlayers) if (s.equalsIgnoreCase(name)) return true;
+        return false;
+    }
+
     public static boolean canUse(ServerCommandSource src) {
         if (src.hasPermissionLevel(CityBuilderMod.config().permissionLevel)) return true;
         if (src.getEntity() instanceof ServerPlayerEntity p) return canUse(p);

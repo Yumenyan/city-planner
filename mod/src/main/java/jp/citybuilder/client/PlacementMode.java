@@ -12,7 +12,10 @@ import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** 配置モード(建物 / 道路 / 区画)の状態。見ている地表ブロックを基準に、プレビューを追従させる。 */
 public final class PlacementMode {
@@ -22,6 +25,13 @@ public final class PlacementMode {
     public static ClientCatalog.Entry entry;
     public static int rot, dx, dy, dz;
     public static BlockPos target;
+    /** 現在の建物の建材置き換え(元ブロックID→先ブロックID)。建物ごとに記憶する。 */
+    public static Map<String, String> materials = new LinkedHashMap<>();
+    private static final Map<String, Map<String, String>> SAVED = new HashMap<>();
+
+    public static Map<String, String> materialsFor(String id) {
+        return SAVED.computeIfAbsent(id, k -> new LinkedHashMap<>());
+    }
 
     public static int roadWidth = 7;
     public static String roadStyle = "asphalt";
@@ -37,6 +47,7 @@ public final class PlacementMode {
 
     public static void startBuilding(ClientCatalog.Entry e) {
         kind = Kind.BUILDING; entry = e; rot = 0; dx = dy = dz = 0; target = null;
+        materials = materialsFor(e.id);
     }
 
     public static void startRoad() {
@@ -102,6 +113,11 @@ public final class PlacementMode {
                 buf.writeString(entry.id, 64);
                 buf.writeBlockPos(o);
                 buf.writeByte(rot);
+                buf.writeVarInt(materials.size());
+                for (Map.Entry<String, String> me : materials.entrySet()) {
+                    buf.writeString(me.getKey(), 80);
+                    buf.writeString(me.getValue(), 80);
+                }
                 ClientPlayNetworking.send(NetIds.PLACE, buf);
                 break;
             }

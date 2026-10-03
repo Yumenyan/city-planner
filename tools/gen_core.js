@@ -10,7 +10,7 @@ const COLORS={
   purple_concrete:'#641f9c',magenta_concrete:'#a9309f',
   glass:'#a9d8e6',light_blue_stained_glass:'#7fb8e0',gray_stained_glass:'#5d6168',tinted_glass:'#2b2733',blue_stained_glass:'#4a63c4',
   black_stained_glass:'#1d1f24',cyan_stained_glass:'#4c8c99',green_stained_glass:'#66a04a',
-  glass_pane:'#a9d8e6',light_blue_stained_glass_pane:'#7fb8e0',gray_stained_glass_pane:'#5d6168',
+  glass_pane:'#a9d8e6',blue_stained_glass_pane:'#3b5fb5',light_gray_stained_glass_pane:'#9a9a94',black_stained_glass_pane:'#1c1d22',cyan_stained_glass_pane:'#2f8ca0',green_stained_glass_pane:'#4a7a3a',light_blue_stained_glass_pane:'#7fb8e0',gray_stained_glass_pane:'#5d6168',
   smooth_stone:'#9e9e9e',stone:'#7d7d7d',stone_bricks:'#7a7a7a',polished_andesite:'#848a84',andesite:'#888888',cobblestone:'#7b7b7b',
   smooth_quartz:'#ece8e2',quartz_block:'#ebe6df',quartz_pillar:'#e9e4dc',chiseled_quartz_block:'#e8e3da',
   sea_lantern:'#c7e0dc',iron_bars:'#9a9a9a',iron_block:'#d8d8d8',iron_door:'#cfcfcf',iron_trapdoor:'#c6c6c6',lightning_rod:'#c47a50',
@@ -24,6 +24,8 @@ const COLORS={
   blue_wool:'#35399d',yellow_wool:'#f8c627',green_wool:'#667a28',orange_wool:'#f07613',gray_wool:'#3e4447',light_gray_wool:'#8e8e86',
   black_wool:'#15151a',white_carpet:'#e9ecec',gray_carpet:'#3e4447',red_carpet:'#a12722',light_blue_carpet:'#3aafd9',
   redstone_lamp:'#8a5b3a',glowstone:'#e0b66a',shroomlight:'#f09a4c',light_gray_stained_glass:'#8e8e86',
+  allium:'#b78ae0',poppy:'#d02a22',dandelion:'#f2d230',blue_orchid:'#2ab5d8',moss_block:'#596d2d',
+  oak_pressure_plate:'#a2824f',chain:'#3a4150',
   mud_bricks:'#8a6e57',bricks:'#966454',podzol:'#5c4021',sand:'#dbd3a0',gravel:'#837f7e'
 };
 function stripProps(s){const i=s.indexOf('[');return i<0?s:s.slice(0,i);}
@@ -31,7 +33,7 @@ function colorOf(state){
   const n=stripProps(state);if(COLORS[n])return COLORS[n];
   const base=n.replace(/_(slab|stairs|wall|fence|door|trapdoor|button|pressure_plate|carpet)$/,'');
   for(const c of [base,base+'_block',base+'s',base+'_planks'])if(COLORS[c])return COLORS[c];
-  return '#ff00ff';
+  if(process.env.DBGCOL)console.error('MISS',n);return '#ff00ff';
 }
 
 /* ---------- ブロック状態の組み立て ---------- */
@@ -96,16 +98,24 @@ function schemBytes(v,name){
   w.u8(0);
   return zlib.gzipSync(Buffer.from(w.out()),{level:9});
 }
-/* 真上から見た色(WebUIのサムネイル用) */
+/* 真上から見た色(WebUIのサムネイル用)。文字→色(pal)と、文字→ブロック名(bk)を返す。bk は素材変更時の再着色に使う */
 function thumbnail(v){
-  const chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',pal={},pm={};let rows=[];
+  const chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',pal={},bk={},pm={};let rows=[];
   for(let z=0;z<v.l;z++){let r='';
     for(let x=0;x<v.w;x++){
       let s='air';for(let y=v.h-1;y>=0;y--){s=v.get(x,y,z);if(s!=='air')break;}
       if(s==='air'){r+='.';continue;}
-      const c=colorOf(s);if(!pm[c]){pm[c]=chars[Object.keys(pm).length];pal[pm[c]]=c;}r+=pm[c];}
+      const n=stripProps(s);
+      if(!pm[n]){const k=Object.keys(pm).length;pm[n]=k<chars.length?chars[k]:String.fromCharCode(0x100+k);pal[pm[n]]=colorOf(s);bk[pm[n]]=n;}
+      r+=pm[n];}
     rows.push(r);}
-  return {top:rows.join('/'),pal};
+  return {top:rows.join('/'),pal,bk};
+}
+/* 使用ブロックの内訳(多い順)。素材変更の候補表示用 */
+function materials(v){
+  const cnt={};
+  for(let i=0;i<v.a.length;i++){const n=stripProps(v.pal[v.a[i]]);if(n==='air')continue;cnt[n]=(cnt[n]||0)+1;}
+  return Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,16).map(([b,n])=>({b,n}));
 }
 const OUT=path.join(__dirname,'..','server-data','citybuilder');
 const catalog=[],webCatalog=[];
@@ -116,7 +126,7 @@ function emit(id,meta,v){
   const e={id,name:meta.name,category:meta.cat,size:[v.w,v.h,v.l],margin,description:meta.desc||''};
   if(meta.floors)e.floors=meta.floors;
   catalog.push(e);
-  webCatalog.push(Object.assign({},e,thumbnail(v)));
+  webCatalog.push(Object.assign({},e,thumbnail(v),{materials:materials(v)}));
 }
 function finish(){
   fs.writeFileSync(path.join(OUT,'catalog.json'),JSON.stringify({version:1,buildings:catalog},null,2));

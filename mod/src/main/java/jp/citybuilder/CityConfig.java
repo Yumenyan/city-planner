@@ -41,6 +41,14 @@ public final class CityConfig {
     public boolean templateFoundation = true;
     /** 基礎で埋める最大深さ */
     public int foundationDepth = 8;
+    /** クライアントからの .schem アップロードを許可する */
+    public boolean allowUpload = true;
+    /** アップロードに必要なOPレベル(allowedPlayers に載っていれば不要) */
+    public int uploadPermissionLevel = 2;
+    /** アップロードできる .schem の最大サイズ(バイト) */
+    public int maxUploadBytes = 2_000_000;
+    /** 同じIDのテンプレートの上書きを許可する */
+    public boolean allowUploadOverwrite = false;
     public List<String> allowedDimensions = new ArrayList<>(List.of("minecraft:overworld"));
     /** 空でなければ、この範囲内にだけ建築できる */
     public List<IntBox> buildAreas = new ArrayList<>();
@@ -75,6 +83,7 @@ public final class CityConfig {
         c.blocksPerTick = Math.max(100, c.blocksPerTick);
         c.maxPlaceDistance = Math.max(8, Math.min(512, c.maxPlaceDistance));
         c.historyDepth = Math.max(0, c.historyDepth);
+        c.maxUploadBytes = Math.max(10_000, Math.min(16_000_000, c.maxUploadBytes));
         try (Writer w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
             gson.toJson(c, w); // 欠けている項目を既定値で書き戻す
         } catch (IOException e) {

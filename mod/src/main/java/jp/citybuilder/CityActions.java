@@ -11,6 +11,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** パケット・コマンド・プランから共通で呼ぶ「配置API」。検証して問題なければジョブを積む。エラー文 or null を返す。 */
@@ -22,6 +23,16 @@ public final class CityActions {
     public static UUID ownerOf(ServerPlayerEntity p) { return p == null ? CONSOLE : p.getUuid(); }
 
     public static String placeTemplate(ServerWorld w, ServerPlayerEntity p, String id, BlockPos pos, int rot) {
+        return placeTemplate(w, p, id, pos, rot, null);
+    }
+
+    public static String placeTemplate(ServerWorld w, ServerPlayerEntity p, String id, BlockPos pos, int rot, Map<String, String> materials) {
+        Map<Block, Block> mat = null;
+        if (materials != null && !materials.isEmpty()) {
+            String[] e = new String[1];
+            mat = Materials.parse(materials, e);
+            if (mat == null) return e[0];
+        }
         BuildingCatalog cat = CityBuilderMod.catalog();
         Template t = cat.template(id);
         if (t == null) return "不明なテンプレート: " + id;
@@ -33,7 +44,7 @@ public final class CityActions {
         if (t.volume() > CityBuilderMod.config().maxVolume) return "建物が大きすぎます";
         if (!CityBuilderMod.jobs().canAccept(t.volume())) return "作業キューが一杯です。完了を待ってください";
         CityConfig c = CityBuilderMod.config();
-        CityBuilderMod.jobs().submit(new TemplateJob(ownerOf(p), w, t, pos, rot, c.templateFoundation, c.foundationDepth));
+        CityBuilderMod.jobs().submit(new TemplateJob(ownerOf(p), w, t, pos, rot, c.templateFoundation, c.foundationDepth, mat));
         return null;
     }
 
@@ -74,13 +85,13 @@ public final class CityActions {
 
     // ---- パケット経由(プレイヤー操作) ----
 
-    private static void reply(ServerPlayerEntity p, String msg, boolean ok) {
+    public static void reply(ServerPlayerEntity p, String msg, boolean ok) {
         p.sendMessage(Text.literal((ok ? "§a" : "§c") + "[CityBuilder] " + msg), true);
     }
 
-    public static void onPlace(ServerPlayerEntity p, String id, BlockPos pos, int rot) {
+    public static void onPlace(ServerPlayerEntity p, String id, BlockPos pos, int rot, Map<String, String> materials) {
         String err = PlacementValidator.checkPlayerRequest(p);
-        if (err == null) err = placeTemplate((ServerWorld) p.world, p, id, pos, rot);
+        if (err == null) err = placeTemplate((ServerWorld) p.world, p, id, pos, rot, materials);
         if (err != null) reply(p, err, false);
         else reply(p, "配置を開始: " + id, true);
     }

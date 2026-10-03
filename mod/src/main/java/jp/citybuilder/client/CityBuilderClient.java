@@ -40,7 +40,17 @@ public final class CityBuilderClient implements ClientModInitializer {
             client.execute(() -> ClientCatalog.update(new String(bytes, StandardCharsets.UTF_8)));
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(NetIds.PLAN_PREVIEW, (client, handler, buf, sender) -> {
+            net.minecraft.network.PacketByteBuf copy = new net.minecraft.network.PacketByteBuf(buf.copy());
+            client.execute(() -> PlanPreview.read(copy));
+        });
+
         ClientTickEvents.END_CLIENT_TICK.register(CityBuilderClient::tick);
+        ClientTickEvents.END_CLIENT_TICK.register(UploadTask::tick);
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            PlanPreview.clear();
+            UploadTask.cancel();
+        });
 
         // 配置モード中の左/右クリックは tick 開始時に消費して処理する(バニラの破壊・設置を防ぐ)
         ClientTickEvents.START_CLIENT_TICK.register(PlacementMode::input);
@@ -69,10 +79,20 @@ public final class CityBuilderClient implements ClientModInitializer {
     }
 
     private static void hud(MatrixStack m, float tickDelta) {
-        if (!PlacementMode.active()) return;
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.currentScreen != null) return;
-        int x = 8, y = 8;
+        int hy = 8;
+        if (UploadTask.active()) {
+            mc.textRenderer.drawWithShadow(m, Text.literal("§b" + UploadTask.progress()), 8, hy, 0xFFFFFF);
+            hy += 12;
+        }
+        if (PlanPreview.active()) {
+            mc.textRenderer.drawWithShadow(m, Text.literal("§eプランのプレビュー: §f" + PlanPreview.name + " §7(" + PlanPreview.summary + ")"), 8, hy, 0xFFFFFF);
+            mc.textRenderer.drawWithShadow(m, Text.literal("§a/citybuilder plan confirm§7 で建築 / §c/citybuilder plan cancel§7 で取り消し"), 8, hy + 12, 0xFFFFFF);
+            hy += 28;
+        }
+        if (!PlacementMode.active()) return;
+        int x = 8, y = hy;
         String head;
         String help;
         switch (PlacementMode.kind) {

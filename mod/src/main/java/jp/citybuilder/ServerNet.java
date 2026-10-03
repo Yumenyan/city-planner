@@ -8,6 +8,8 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.BlockPos;
 
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** クライアント⇔サーバーの通信。クライアントには建物IDと寸法などのカタログ情報だけを送る。 */
 public final class ServerNet {
@@ -25,9 +27,39 @@ public final class ServerNet {
                 String id = buf.readString(64);
                 BlockPos pos = buf.readBlockPos();
                 int rot = buf.readByte();
-                server.execute(() -> CityActions.onPlace(player, id, pos, rot));
+                int n = buf.readVarInt();
+                if (n < 0 || n > Materials.MAX_ENTRIES) return;
+                Map<String, String> mat = new LinkedHashMap<>();
+                for (int i = 0; i < n; i++) {
+                    String from = buf.readString(80);
+                    String to = buf.readString(80);
+                    mat.put(from, to);
+                }
+                server.execute(() -> CityActions.onPlace(player, id, pos, rot, mat));
             } catch (RuntimeException e) {
                 CityBuilderMod.LOG.warn("不正な place パケット: {}", e.toString());
+            }
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(NetIds.UPLOAD_BEGIN, (server, player, handler, buf, sender) -> {
+            try {
+                String id = buf.readString(64);
+                String name = buf.readString(64);
+                String category = buf.readString(32);
+                String desc = buf.readString(200);
+                int total = buf.readVarInt();
+                server.execute(() -> UploadManager.begin(player, id, name, category, desc, total));
+            } catch (RuntimeException e) {
+                CityBuilderMod.LOG.warn("不正な upload_begin パケット: {}", e.toString());
+            }
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(NetIds.UPLOAD_CHUNK, (server, player, handler, buf, sender) -> {
+            try {
+                byte[] data = buf.readByteArray(32000);
+                server.execute(() -> UploadManager.chunk(player, data));
+            } catch (RuntimeException e) {
+                CityBuilderMod.LOG.warn("不正な upload_chunk パケット: {}", e.toString());
             }
         });
 
@@ -67,7 +99,8 @@ public final class ServerNet {
 
     public static void sendCatalog(ServerPlayerEntity p) {
         CityConfig c = CityBuilderMod.config();
-        String json = CityBuilderMod.catalog().toClientJson(PlacementValidator.canUse(p), c.maxPlaceDistance);
+        String json = CityBuilderMod.catalog().toClientJson(PlacementValidator.canUse(p), c.maxPlaceDistance,
+                PlacementValidator.canUpload(p), c.maxUploadBytes);
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeByteArray(json.getBytes(StandardCharsets.UTF_8));
         ServerPlayNetworking.send(p, NetIds.CATALOG, buf);

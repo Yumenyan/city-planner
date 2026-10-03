@@ -526,6 +526,388 @@
       ],
       "margin": 0,
       "description": "道路脇に立つ電柱と腕木"
+    },
+    {
+      "id": "apt_mid_03",
+      "name": "マンション(10階・グレー)",
+      "category": "住宅",
+      "size": [
+        20,
+        55,
+        16
+      ],
+      "margin": 2,
+      "description": "グレーの外壁にガラスの手すりのバルコニーが並ぶ中層マンション",
+      "floors": 10
+    },
+    {
+      "id": "apt_mid_04",
+      "name": "マンション(9階・茶色)",
+      "category": "住宅",
+      "size": [
+        18,
+        51,
+        16
+      ],
+      "margin": 2,
+      "description": "茶色いタイル調の外壁の中層マンション",
+      "floors": 9
+    },
+    {
+      "id": "apt_high_02",
+      "name": "タワーマンション(22階・青)",
+      "category": "住宅",
+      "size": [
+        22,
+        103,
+        20
+      ],
+      "margin": 2,
+      "description": "青い窓と白い柱の高層タワーマンション",
+      "floors": 22
+    },
+    {
+      "id": "house_mod_03",
+      "name": "モダン住宅C(木目の張り出し)",
+      "category": "住宅",
+      "size": [
+        18,
+        12,
+        18
+      ],
+      "margin": 2,
+      "description": "2階が張り出した木目の箱型住宅。下はカーポート",
+      "floors": 2
+    },
+    {
+      "id": "mansion_01",
+      "name": "邸宅(プール付き)",
+      "category": "住宅",
+      "size": [
+        26,
+        13,
+        24
+      ],
+      "margin": 2,
+      "description": "ガラス張りの1階と白い2階、庭のプールがある大型住宅",
+      "floors": 2
+    },
+    {
+      "id": "office_04",
+      "name": "オフィスビル(6階・白)",
+      "category": "オフィス",
+      "size": [
+        18,
+        39,
+        16
+      ],
+      "margin": 2,
+      "description": "白い外壁の小規模な中層オフィス",
+      "floors": 6
+    },
+    {
+      "id": "office_05",
+      "name": "オフィスビル(15階・黒)",
+      "category": "オフィス",
+      "size": [
+        22,
+        75,
+        20
+      ],
+      "margin": 2,
+      "description": "黒いガラスのシャープな高層オフィス",
+      "floors": 15
+    },
+    {
+      "id": "office_06",
+      "name": "超高層オフィス(40階)",
+      "category": "オフィス",
+      "size": [
+        28,
+        175,
+        26
+      ],
+      "margin": 2,
+      "description": "二段に絞られた青緑ガラスの超高層ビル",
+      "floors": 30
+    },
+    {
+      "id": "hotel_01",
+      "name": "ビジネスホテル(12階)",
+      "category": "商業",
+      "size": [
+        20,
+        63,
+        16
+      ],
+      "margin": 2,
+      "description": "客室の窓が整然と並ぶ駅前のビジネスホテル",
+      "floors": 12
+    },
+    {
+      "id": "department_01",
+      "name": "百貨店(6階)",
+      "category": "商業",
+      "size": [
+        32,
+        45,
+        26
+      ],
+      "margin": 2,
+      "description": "赤い帯の入った大型の百貨店",
+      "floors": 6
+    },
+    {
+      "id": "police_station_01",
+      "name": "警察署(5階)",
+      "category": "公共",
+      "size": [
+        24,
+        35,
+        18
+      ],
+      "margin": 2,
+      "description": "青い帯の入った5階建ての警察署",
+      "floors": 5
+    },
+    {
+      "id": "library_01",
+      "name": "図書館(3階)",
+      "category": "公共",
+      "size": [
+        28,
+        30,
+        22
+      ],
+      "margin": 2,
+      "description": "ガラスのファサードと白い柱の図書館",
+      "floors": 3
+    },
+    {
+      "id": "drugstore_01",
+      "name": "ドラッグストア",
+      "category": "商業",
+      "size": [
+        26,
+        10,
+        24
+      ],
+      "margin": 2,
+      "description": "緑の看板と駐車場のあるロードサイドのドラッグストア",
+      "floors": 1
+    },
+    {
+      "id": "conv_03",
+      "name": "コンビニ(オレンジ)",
+      "category": "商業",
+      "size": [
+        26,
+        10,
+        24
+      ],
+      "margin": 2,
+      "description": "オレンジ色の看板のコンビニ",
+      "floors": 1
+    },
+    {
+      "id": "cafe_01",
+      "name": "カフェ(テラス席付き)",
+      "category": "商業",
+      "size": [
+        20,
+        9,
+        18
+      ],
+      "margin": 2,
+      "description": "ガラス張りの店内と、赤白の日よけのテラス席があるカフェ",
+      "floors": 1
+    },
+    {
+      "id": "bank_01",
+      "name": "銀行(柱廊付き)",
+      "category": "商業",
+      "size": [
+        22,
+        18,
+        22
+      ],
+      "margin": 2,
+      "description": "石造り風の柱廊を持つ3階建ての銀行",
+      "floors": 3
+    },
+    {
+      "id": "car_dealer_01",
+      "name": "カーディーラー",
+      "category": "商業",
+      "size": [
+        24,
+        9,
+        30
+      ],
+      "margin": 2,
+      "description": "ガラス張りのショールームと展示場のある自動車販売店",
+      "floors": 1
+    },
+    {
+      "id": "shopping_row_01",
+      "name": "商店街(3軒つながり)",
+      "category": "商業",
+      "size": [
+        28,
+        11,
+        15
+      ],
+      "margin": 2,
+      "description": "色の違う日よけを持つ2階建て店舗が3軒並んだ商店街の一角",
+      "floors": 2
+    },
+    {
+      "id": "kindergarten_01",
+      "name": "保育園(園庭付き)",
+      "category": "公共",
+      "size": [
+        24,
+        8,
+        25
+      ],
+      "margin": 2,
+      "description": "カラフルな平屋の園舎と、すべり台・ブランコのある園庭",
+      "floors": 1
+    },
+    {
+      "id": "gym_01",
+      "name": "体育館",
+      "category": "公共",
+      "size": [
+        34,
+        16,
+        28
+      ],
+      "margin": 2,
+      "description": "かまぼこ形の屋根と帯状の窓、木の床を持つ体育館",
+      "floors": 1
+    },
+    {
+      "id": "substation_01",
+      "name": "変電所",
+      "category": "産業",
+      "size": [
+        24,
+        10,
+        20
+      ],
+      "margin": 0,
+      "description": "フェンスで囲まれた変圧器・門型鉄塔・制御棟のある変電所",
+      "floors": 1
+    },
+    {
+      "id": "datacenter_01",
+      "name": "データセンター",
+      "category": "産業",
+      "size": [
+        32,
+        16,
+        28
+      ],
+      "margin": 2,
+      "description": "窓のない箱型の建物と屋上の冷却装置を持つデータセンター",
+      "floors": 2
+    },
+    {
+      "id": "bus_terminal_01",
+      "name": "バスターミナル(4バース)",
+      "category": "交通",
+      "size": [
+        38,
+        9,
+        20
+      ],
+      "margin": 0,
+      "description": "屋根付きの乗降場が4つ並ぶバスターミナル"
+    },
+    {
+      "id": "soccer_field_01",
+      "name": "サッカー場(陸上トラック付き)",
+      "category": "緑地・広場",
+      "size": [
+        52,
+        7,
+        36
+      ],
+      "margin": 0,
+      "description": "芝のピッチ・ゴール・白線とトラック、北側に観客席"
+    },
+    {
+      "id": "tennis_court_01",
+      "name": "テニスコート(2面)",
+      "category": "緑地・広場",
+      "size": [
+        28,
+        6,
+        32
+      ],
+      "margin": 0,
+      "description": "フェンスで囲まれた2面のハードコート"
+    },
+    {
+      "id": "playground_01",
+      "name": "児童公園",
+      "category": "緑地・広場",
+      "size": [
+        18,
+        7,
+        16
+      ],
+      "margin": 0,
+      "description": "滑り台・ブランコ・シーソーのある小さな公園"
+    },
+    {
+      "id": "parking_flat_01",
+      "name": "平面駐車場",
+      "category": "交通",
+      "size": [
+        32,
+        8,
+        22
+      ],
+      "margin": 0,
+      "description": "白線と車止め、街灯のある2列の平面駐車場"
+    },
+    {
+      "id": "pond_park_01",
+      "name": "池のある公園",
+      "category": "緑地・広場",
+      "size": [
+        34,
+        10,
+        30
+      ],
+      "margin": 0,
+      "description": "池と木の橋、園路とベンチのある公園"
+    },
+    {
+      "id": "street_tree_01",
+      "name": "街路樹(1本)",
+      "category": "都市設備",
+      "size": [
+        5,
+        9,
+        5
+      ],
+      "margin": 0,
+      "description": "歩道に植えられた街路樹"
+    },
+    {
+      "id": "street_trees_01",
+      "name": "街路樹と歩道(24m)",
+      "category": "都市設備",
+      "size": [
+        5,
+        9,
+        24
+      ],
+      "margin": 0,
+      "description": "街路樹・ベンチ・街灯が並んだ歩道の一区画"
     }
   ]
 }

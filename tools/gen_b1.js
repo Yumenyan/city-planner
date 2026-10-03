@@ -330,4 +330,4 @@ function convenienceSet(){
   convenience('conv_01',{name:'コンビニ(青白)',cat:'商業',desc:'正面にガラス張りの店舗と駐車スペース'},['blue_concrete','white_concrete']);
   convenience('conv_02',{name:'コンビニ(緑赤)',cat:'商業',desc:'正面にガラス張りの店舗と駐車スペース'},['green_concrete','red_concrete']);
 }
-module.exports={buildResidential,buildOffice,convenienceSet,gasStation,mall,supermarket,parkingMulti,restaurant,lot,planter,roofKit,shaft,rng,M};
+module.exports={tower,hollow,houseModern,buildResidential,buildOffice,convenienceSet,gasStation,mall,supermarket,parkingMulti,restaurant,lot,planter,roofKit,shaft,rng,M,convenience};

@@ -34,6 +34,6 @@ public final class CityBuilderMod implements ModInitializer {
         CityCommands.register();
         ServerTickEvents.END_SERVER_TICK.register((MinecraftServer server) -> jobs.tick(server));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> ServerNet.sendCatalog(handler.player));
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> jobs = new JobManager());
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> { jobs = new JobManager(); PlanSessions.clearAll(); UploadManager.clear(); });
     }
 }

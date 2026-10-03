@@ -1,11 +1,13 @@
 package jp.citybuilder.job;
 
 import jp.citybuilder.Template;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.Map;
 import java.util.UUID;
 
 /** 建物(.schem)を配置するジョブ。pos は回転後の最小コーナー。 */
@@ -24,11 +26,16 @@ public final class TemplateJob extends Job {
 
     public TemplateJob(UUID owner, ServerWorld world, Template t, BlockPos origin, int rot,
                        boolean foundation, int foundDepth) {
+        this(owner, world, t, origin, rot, foundation, foundDepth, null);
+    }
+
+    public TemplateJob(UUID owner, ServerWorld world, Template t, BlockPos origin, int rot,
+                       boolean foundation, int foundDepth, Map<Block, Block> materials) {
         super(owner, t.id, world);
         this.t = t;
         this.o = origin;
         this.rot = rot & 3;
-        this.pal = t.palette(this.rot);
+        this.pal = t.palette(this.rot, materials);
         this.foundation = foundation;
         this.foundDepth = foundDepth;
         this.rw = t.rw(this.rot);

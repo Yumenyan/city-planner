@@ -1,11 +1,13 @@
 package jp.citybuilder;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +40,8 @@ public final class BuildingCatalog {
 
     private final Map<String, Entry> entries = new LinkedHashMap<>();
     private final Map<String, Template> templates = new LinkedHashMap<>();
+    /** アップロードされた建物のメタ情報(uploads.json に保存) */
+    private final List<Entry> uploaded = new ArrayList<>();
 
     public static BuildingCatalog load() {
         BuildingCatalog c = new BuildingCatalog();
@@ -56,6 +60,22 @@ public final class BuildingCatalog {
                 if (f != null && f.buildings != null) listed = f.buildings;
             } catch (Exception e) {
                 CityBuilderMod.LOG.warn("catalog.json を読めませんでした: {}", e.toString());
+            }
+        }
+        Path uf = dir.resolve("uploads.json");
+        if (Files.exists(uf)) {
+            try (Reader r = Files.newBufferedReader(uf, StandardCharsets.UTF_8)) {
+                CatalogFile f = new Gson().fromJson(r, CatalogFile.class);
+                if (f != null && f.buildings != null) {
+                    for (Entry e : f.buildings) {
+                        if (e == null || e.id == null) continue;
+                        c.uploaded.add(e);
+                        listed.removeIf(x -> x != null && e.id.equals(x.id));
+                        listed.add(e);
+                    }
+                }
+            } catch (Exception e) {
+                CityBuilderMod.LOG.warn("uploads.json を読めませんでした: {}", e.toString());
             }
         }
         for (Entry e : listed) {
@@ -105,17 +125,42 @@ public final class BuildingCatalog {
         }
     }
 
+    public static boolean validId(String id) {
+        return id != null && id.length() <= 48 && ID_RE.matcher(id).matches();
+    }
+
+    public boolean has(String id) { return entries.containsKey(id); }
+
+    /** アップロードされたテンプレートを保存して登録する。 */
+    public synchronized void addUpload(Entry e, Template t, byte[] bytes) throws IOException {
+        Path tdir = CityConfig.dir().resolve("templates");
+        Files.createDirectories(tdir);
+        Files.write(tdir.resolve(e.id + ".schem"), bytes);
+        e.size = new int[]{t.w, t.h, t.l};
+        templates.put(e.id, t);
+        entries.put(e.id, e);
+        uploaded.removeIf(x -> e.id.equals(x.id));
+        uploaded.add(e);
+        CatalogFile f = new CatalogFile();
+        f.buildings = uploaded;
+        try (Writer w = Files.newBufferedWriter(CityConfig.dir().resolve("uploads.json"), StandardCharsets.UTF_8)) {
+            new GsonBuilder().setPrettyPrinting().create().toJson(f, w);
+        }
+    }
+
     public Entry get(String id) { return id == null ? null : entries.get(id); }
     public Template template(String id) { return id == null ? null : templates.get(id); }
     public Iterable<Entry> all() { return entries.values(); }
     public int size() { return entries.size(); }
 
     /** クライアントに送る内容(ブロックデータは含まない) */
-    public String toClientJson(boolean canBuild, int maxDistance) {
+    public String toClientJson(boolean canBuild, int maxDistance, boolean canUpload, int maxUploadBytes) {
         JsonObject root = new JsonObject();
-        root.addProperty("version", 1);
+        root.addProperty("version", 2);
         root.addProperty("canBuild", canBuild);
         root.addProperty("maxDistance", maxDistance);
+        root.addProperty("canUpload", canUpload);
+        root.addProperty("maxUploadBytes", maxUploadBytes);
         JsonArray arr = new JsonArray();
         for (Entry e : entries.values()) {
             JsonObject o = new JsonObject();
@@ -127,6 +172,17 @@ public final class BuildingCatalog {
             JsonArray sz = new JsonArray();
             sz.add(e.size[0]); sz.add(e.size[1]); sz.add(e.size[2]);
             o.add("size", sz);
+            JsonArray mats = new JsonArray();
+            Template t = templates.get(e.id);
+            if (t != null) {
+                for (Map.Entry<String, Integer> m : t.materials(16)) {
+                    JsonObject mo = new JsonObject();
+                    mo.addProperty("b", m.getKey());
+                    mo.addProperty("n", m.getValue());
+                    mats.add(mo);
+                }
+            }
+            o.add("materials", mats);
             arr.add(o);
         }
         root.add("buildings", arr);

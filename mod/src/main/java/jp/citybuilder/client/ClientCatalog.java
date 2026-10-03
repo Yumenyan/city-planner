@@ -15,12 +15,16 @@ public final class ClientCatalog {
     public static final class Entry {
         public String id, name, category, description;
         public int floors, w, h, l;
+        /** 使われている建材 {ブロックID, 個数}(多い順) */
+        public final List<Object[]> materials = new ArrayList<>();
     }
 
     private static List<Entry> entries = new ArrayList<>();
     private static List<String> categories = new ArrayList<>();
     public static boolean canBuild = false;
     public static int maxDistance = 160;
+    public static boolean canUpload = false;
+    public static int maxUploadBytes = 2_000_000;
 
     private ClientCatalog() {}
 
@@ -29,6 +33,8 @@ public final class ClientCatalog {
             JsonObject root = JsonParser.parseString(json).getAsJsonObject();
             canBuild = root.has("canBuild") && root.get("canBuild").getAsBoolean();
             maxDistance = root.has("maxDistance") ? root.get("maxDistance").getAsInt() : 160;
+            canUpload = root.has("canUpload") && root.get("canUpload").getAsBoolean();
+            maxUploadBytes = root.has("maxUploadBytes") ? root.get("maxUploadBytes").getAsInt() : 2_000_000;
             List<Entry> list = new ArrayList<>();
             Set<String> cats = new LinkedHashSet<>();
             JsonArray arr = root.getAsJsonArray("buildings");
@@ -44,6 +50,12 @@ public final class ClientCatalog {
                 e.w = sz.get(0).getAsInt();
                 e.h = sz.get(1).getAsInt();
                 e.l = sz.get(2).getAsInt();
+                if (o.has("materials")) {
+                    for (JsonElement me : o.getAsJsonArray("materials")) {
+                        JsonObject mo = me.getAsJsonObject();
+                        e.materials.add(new Object[]{mo.get("b").getAsString(), mo.get("n").getAsInt()});
+                    }
+                }
                 list.add(e);
                 cats.add(e.category);
             }
