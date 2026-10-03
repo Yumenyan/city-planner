@@ -1,0 +1,54 @@
+# --- Gradle / Fabric Loom ---
+.gradle/
+build/
+mod/.gradle/
+mod/build/
+mod/run/
+mod/out/
+mod/bin/
+*.jar
+!gradle-wrapper.jar
+!mod/gradle/wrapper/gradle-wrapper.jar
+# ビルド成果物の jar(リリースは GitHub Releases に添付する)
+
+# --- IDE ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- ログ・一時ファイル ---
+*.log
+*.tmp
+*.bak
+*~
+hs_err_pid*
+
+# --- Node / Python(テンプレート生成・WebUIビルド用ツール) ---
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+
+# --- 開発中のスクリーンショット等 ---
+tools/*.png
+webui/*.png
+
+# --- 配布用の zip ---
+*.zip
+
+# --- 実サーバーのデータをうっかり入れないため ---
+# (同梱のサンプルは server-data/ にあるのでコミット対象。以下は実運用のコピー先)
+config/
+world/
+logs/
