@@ -1,0 +1,65 @@
+package jp.citybuilder.client;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/** サーバーから受け取った建物カタログ(ブロックデータは持たない) */
+public final class ClientCatalog {
+    public static final class Entry {
+        public String id, name, category, description;
+        public int floors, w, h, l;
+    }
+
+    private static List<Entry> entries = new ArrayList<>();
+    private static List<String> categories = new ArrayList<>();
+    public static boolean canBuild = false;
+    public static int maxDistance = 160;
+
+    private ClientCatalog() {}
+
+    public static void update(String json) {
+        try {
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            canBuild = root.has("canBuild") && root.get("canBuild").getAsBoolean();
+            maxDistance = root.has("maxDistance") ? root.get("maxDistance").getAsInt() : 160;
+            List<Entry> list = new ArrayList<>();
+            Set<String> cats = new LinkedHashSet<>();
+            JsonArray arr = root.getAsJsonArray("buildings");
+            for (JsonElement el : arr) {
+                JsonObject o = el.getAsJsonObject();
+                Entry e = new Entry();
+                e.id = o.get("id").getAsString();
+                e.name = o.get("name").getAsString();
+                e.category = o.get("category").getAsString();
+                e.description = o.has("description") ? o.get("description").getAsString() : "";
+                e.floors = o.has("floors") ? o.get("floors").getAsInt() : 0;
+                JsonArray sz = o.getAsJsonArray("size");
+                e.w = sz.get(0).getAsInt();
+                e.h = sz.get(1).getAsInt();
+                e.l = sz.get(2).getAsInt();
+                list.add(e);
+                cats.add(e.category);
+            }
+            entries = list;
+            categories = new ArrayList<>(cats);
+        } catch (RuntimeException ex) {
+            // 不正なデータは無視(既存のカタログを維持)
+        }
+    }
+
+    public static List<Entry> all() { return entries; }
+    public static List<String> categories() { return categories; }
+
+    public static List<Entry> inCategory(String c) {
+        List<Entry> r = new ArrayList<>();
+        for (Entry e : entries) if (e.category.equals(c)) r.add(e);
+        return r;
+    }
+}

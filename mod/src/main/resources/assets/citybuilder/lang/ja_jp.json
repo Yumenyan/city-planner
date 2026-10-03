@@ -1,0 +1,11 @@
+{
+  "key.categories.citybuilder": "City Builder",
+  "key.citybuilder.open": "City Builderメニューを開く",
+  "key.citybuilder.rotate": "建物を90度回転",
+  "key.citybuilder.nudge_north": "北(-Z)へ1ブロック",
+  "key.citybuilder.nudge_south": "南(+Z)へ1ブロック",
+  "key.citybuilder.nudge_west": "西(-X)へ1ブロック",
+  "key.citybuilder.nudge_east": "東(+X)へ1ブロック",
+  "key.citybuilder.nudge_up": "建物を1ブロック上げる",
+  "key.citybuilder.nudge_down": "建物を1ブロック下げる"
+}

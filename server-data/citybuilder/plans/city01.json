@@ -1,0 +1,198 @@
+{
+ "name": "city01",
+ "version": 1,
+ "items": [
+  {
+   "type": "road",
+   "points": [
+    [
+     -120,
+     0
+    ],
+    [
+     120,
+     0
+    ]
+   ],
+   "width": 9,
+   "sidewalk": true,
+   "style": "asphalt",
+   "lines": "dashed"
+  },
+  {
+   "type": "road",
+   "points": [
+    [
+     -80,
+     -70
+    ],
+    [
+     -80,
+     70
+    ]
+   ],
+   "width": 7,
+   "sidewalk": true,
+   "style": "asphalt",
+   "lines": "dashed"
+  },
+  {
+   "type": "road",
+   "points": [
+    [
+     80,
+     -70
+    ],
+    [
+     80,
+     70
+    ]
+   ],
+   "width": 7,
+   "sidewalk": true,
+   "style": "asphalt",
+   "lines": "dashed"
+  },
+  {
+   "type": "building",
+   "template": "apt_mid_01",
+   "x": -76,
+   "z": -20,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "office_01",
+   "x": -58,
+   "z": -24,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "office_02",
+   "x": -38,
+   "z": -26,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "apt_high_01",
+   "x": -14,
+   "z": -24,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "office_03",
+   "x": 10,
+   "z": -32,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "apt_mid_02",
+   "x": 38,
+   "z": -20,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "hospital_01",
+   "x": -118,
+   "z": -28,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "fire_station_01",
+   "x": 84,
+   "z": -28,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "mall_01",
+   "x": -76,
+   "z": 5,
+   "rotation": 2
+  },
+  {
+   "type": "building",
+   "template": "station_small_01",
+   "x": -14,
+   "z": 5,
+   "rotation": 2
+  },
+  {
+   "type": "building",
+   "template": "supermarket_01",
+   "x": 20,
+   "z": 5,
+   "rotation": 2
+  },
+  {
+   "type": "building",
+   "template": "police_box_01",
+   "x": 58,
+   "z": 5,
+   "rotation": 2
+  },
+  {
+   "type": "building",
+   "template": "warehouse_01",
+   "x": -118,
+   "z": 5,
+   "rotation": 2
+  },
+  {
+   "type": "building",
+   "template": "apt_low_01",
+   "x": 84,
+   "z": 5,
+   "rotation": 2
+  },
+  {
+   "type": "building",
+   "template": "house_mod_01",
+   "x": 104,
+   "z": 5,
+   "rotation": 2
+  },
+  {
+   "type": "building",
+   "template": "crosswalk_01",
+   "x": -72,
+   "z": -4,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "crosswalk_01",
+   "x": -60,
+   "z": -4,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "crosswalk_01",
+   "x": 60,
+   "z": -4,
+   "rotation": 0
+  },
+  {
+   "type": "building",
+   "template": "crosswalk_01",
+   "x": 72,
+   "z": -4,
+   "rotation": 0
+  },
+  {
+   "type": "area",
+   "x1": -120,
+   "z1": -70,
+   "x2": -86,
+   "z2": -50,
+   "style": "grass"
+  }
+ ]
+}
