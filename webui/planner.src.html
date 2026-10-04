@@ -120,7 +120,7 @@ code,.cmd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
       <span class="note" id="rbOdd"></span>
     </div>
     <div id="toast"></div>
-    <div id="dropOv" style="display:none;position:absolute;inset:0;background:#4da3ff33;border:3px dashed var(--acc);align-items:center;justify-content:center;font-size:20px;pointer-events:none">.schem をここにドロップ</div>
+    <div id="dropOv" style="display:none;position:absolute;inset:0;background:#4da3ff33;border:3px dashed var(--acc);align-items:center;justify-content:center;font-size:20px;pointer-events:none">.schem / city.json / JourneyMapのフォルダ をここにドロップ</div>
   </div>
 
   <aside id="right">
@@ -135,11 +135,26 @@ code,.cmd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
     </div>
     <input type="file" id="fImport" accept=".json,application/json" hidden>
     <h2>Minecraftへの反映手順</h2>
-    <div class="note">1. ダウンロードしたファイルをサーバーの<br><code>config/citybuilder/plans/<span id="pn1">city01</span>.json</code> に置く<br>2. 原点にしたい地表ブロックの上に立ち、実行すると<b>範囲のプレビュー</b>(黄色の枠)が出ます:</div>
+    <div class="note">【マルチサーバー】ゲーム内で <b>B →「アップロード」</b>(または「プラン」タブ→「city.json をアップロード…」)からこのJSONを選ぶだけ。サーバー管理者に渡す必要はありません。送信後すぐに範囲プレビューが出ます。<br>【シングル/管理者】<code>config/citybuilder/plans/<span id="pn1">city01</span>.json</code> に置く。<br>コマンドで開始する場合: 原点にしたい地表ブロックの上に立ち、実行すると<b>範囲のプレビュー</b>(黄色の枠)が出ます:</div>
     <code class="cmd" id="cmd1"></code>
     <div class="note">座標を指定する場合(原点=地表ブロック):</div>
     <code class="cmd" id="cmd2"></code>
     <div class="note">位置を確認して <code>/citybuilder plan confirm</code>(またはチャットの[確定して建築])で建築開始。やめるときは <code>plan cancel</code>。建築後も <code>/citybuilder undo</code> で一括して戻せます。</div>
+    <h2>背景地図(JourneyMap)</h2>
+    <div class="note" id="mapNote">JourneyMap の地図データを背景に敷いて、地形に合わせて計画できます(水面にかかる建物・道路は警告)。<br>
+      <b>読み込むフォルダ</b>: <code>.minecraft/journeymap/data/sp/(ワールド名)/DIM0/day</code>(マルチは <code>mp/(サーバー名)/DIM0/day</code>)。フォルダごと、または <code>DIM0</code> フォルダごと画面にドロップできます。</div>
+    <div class="btns"><button class="btn pri" id="bMap">地図フォルダを選ぶ…</button><button class="btn" id="bMapPng">PNGを選ぶ…</button><button class="btn del" id="bMapClear" style="display:none">地図を消す</button></div>
+    <input type="file" id="fMapDir" webkitdirectory directory multiple hidden>
+    <input type="file" id="fMapPng" accept="image/png" multiple hidden>
+    <div id="mapCtl" style="display:none">
+      <div class="row"><label>レイヤー</label><select id="mapLayer"></select></div>
+      <div class="row"><label>濃さ</label><input type="range" id="mapAlpha" min="10" max="100" value="85"></div>
+      <div class="row"><label><input type="checkbox" id="mapShow" checked> 表示</label><button class="btn" id="mapFit">全体表示</button></div>
+      <div class="row"><label>原点X</label><input type="number" id="mapOx" value="0"></div>
+      <div class="row"><label>原点Z</label><input type="number" id="mapOz" value="0"></div>
+      <div class="btns"><button class="btn" id="mapPick">地図をクリックして原点を決める</button></div>
+      <div class="note" id="mapInfo"></div>
+    </div>
     <h2>自作の建物</h2>
     <div class="note" id="customNote">.schem を画面にドラッグ&ドロップ(複数可)すると、寸法と真上の見た目、使われている建材を自動で読み取って「自作」カテゴリに追加します。ゲーム内のアップロード画面からサーバーへ送ることもできます。</div>
     <div id="customList"></div>
@@ -307,6 +322,7 @@ function computeWarnings(){
     if (rectsOverlap(coreRect(bs[i]),coreRect(bs[j]))) {add(bs[i].id,'他の建物と重なっています');add(bs[j].id,'他の建物と重なっています');}
   const roadOk=b=>{const c=CAT[b.template];return c&&(c.category==='都市設備'||b.template==='ped_bridge_01'||b.template==='busstop_01');};
   for (const b of bs) if (!roadOk(b)) for (const r of rs) if (buildingHitsRoad(b,r)) add(b.id,'道路にかかっています');
+  mapWarnings(add);
   return w;
 }
 
@@ -391,6 +407,7 @@ function draw(){
   if (!W) return;
   g.setTransform(DPR,0,0,DPR,0,0);
   g.fillStyle='#0e1013'; g.fillRect(0,0,W,H);
+  drawMap();
   drawGrid();
   const warns=computeWarnings();
   // 区画 → 道路 → 建物 の順(サーバーの施工順と同じ)
@@ -511,8 +528,8 @@ function updateHint(){
 function updateFooter(warns){
   const b=S.items.filter(i=>i.type==='building').length,r=S.items.filter(i=>i.type==='road').length,a=S.items.filter(i=>i.type==='area').length;
   $('fCount').textContent=`建物 ${b} / 道路 ${r} / 区画 ${a}`;
-  $('fPos').textContent=S.mouse.in?`x:${S.mouse.x}  z:${S.mouse.z}`:'x:- z:-';
-  $('fWarn').innerHTML=warns.size?`<span style="color:var(--warn)">⚠ 警告 ${warns.size} 件(建物の重なり/道路との干渉)</span>`:'';
+  $('fPos').textContent=S.mouse.in?`x:${S.mouse.x}  z:${S.mouse.z}`+(mapReady()?`  (ワールド ${S.mouse.x+MAP.ox}, ${S.mouse.z+MAP.oz})`:''):'x:- z:-';
+  $('fWarn').innerHTML=warns.size?`<span style="color:var(--warn)">⚠ 警告 ${warns.size} 件(重なり/道路との干渉/水面)</span>`:'';
 }
 
 /* ---------------- マウス操作 ---------------- */
@@ -552,6 +569,7 @@ cv.addEventListener('mousedown',e=>{
     else if (S.tool!=='select') setTool('select');
     return;
   }
+  if (e.button===0&&S.pickOrigin){S.pickOrigin=false;setOrigin(MAP.ox+p.cx,MAP.oz+p.cz);toast(`原点を設定: ワールド X ${MAP.ox}, Z ${MAP.oz}`);return;}
   if (e.button!==0) return;
   if (S.tool==='select'){
     const sel=getSel(), pi=pickRoadPoint(sel,p.px,p.py);
@@ -591,11 +609,12 @@ window.addEventListener('mouseup',e=>{
 cv.addEventListener('dblclick',e=>{ if (S.tool==='road'&&S.draft){ S.draft.points.pop(); finishRoad(); } });
 cv.addEventListener('wheel',e=>{
   e.preventDefault();
-  const p=evPos(e), k=Math.exp(-e.deltaY*0.0015), ns=clamp(S.view.s*k,0.6,40);
+  const p=evPos(e), k=Math.exp(-e.deltaY*0.0015), ns=clamp(S.view.s*k,0.1,40);
   S.view.s=ns; const [nx,nz]=s2w(p.px,p.py); S.view.x+=p.wx-nx; S.view.z+=p.wz-nz; draw();
 },{passive:false});
 
 window.addEventListener('keydown',e=>{
+  if (e.code==='Escape'&&S.pickOrigin){S.pickOrigin=false;toast('原点の指定を中止');draw();}
   if (e.target.matches('input,select,textarea')) return;
   if (e.code==='Space'){e.spaceDown=true;S.space=true;return;}
   const k=e.key.toLowerCase();
@@ -698,6 +717,7 @@ function renderInspector(soft){
     <div class="note">${Math.abs(s.x2-s.x1)+1} × ${Math.abs(s.z2-s.z1)+1} ブロック</div>
     <div class="btns"><button class="btn" id="iDup">複製</button><button class="btn del" id="iDel">削除</button></div>`;
   }
+  if (s&&s.type!=='building') h+=warnHtml(s);
   el.innerHTML=h; bindInspector(s);
 }
 function roadOptHtml(title){
@@ -793,7 +813,7 @@ function importPlan(obj){
 function syncCmd(){
   const n=planName(); $('pn1').textContent=n;
   $('cmd1').textContent=`/citybuilder plan load ${n}`;
-  $('cmd2').textContent=`/citybuilder plan load ${n} <x> <y> <z>`;
+  $('cmd2').textContent=(typeof mapReady==='function'&&mapReady())?`/citybuilder plan load ${n} ${MAP.ox} ~-1 ${MAP.oz}`:`/citybuilder plan load ${n} <x> <y> <z>`;
 }
 $('planName').addEventListener('input',()=>{syncCmd();autosave();});
 $('bExport').onclick=()=>{
@@ -991,7 +1011,10 @@ window.addEventListener('dragleave',()=>{dragDepth=Math.max(0,dragDepth-1);if(!d
 window.addEventListener('dragover',e=>{e.preventDefault();});
 window.addEventListener('drop',e=>{
   e.preventDefault(); dragDepth=0; $('dropOv').classList.remove('on');
-  const fs=[...(e.dataTransfer?e.dataTransfer.files:[])]; if(!fs.length)return;
+  const fs=[...(e.dataTransfer?e.dataTransfer.files:[])];
+  const ents=[...(e.dataTransfer&&e.dataTransfer.items?e.dataTransfer.items:[])].map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
+  if (ents.some(en=>en.isDirectory)||(fs.length&&fs.every(f=>/\.png$/i.test(f.name)))){importMapEntries(ents.some(en=>en.isDirectory)?ents:null,fs);return;}
+  if(!fs.length)return;
   const schems=fs.filter(f=>/\.schem(atic)?$/i.test(f.name));
   if (schems.length) importSchems(schems);
   else if (fs.length===1&&/\.json$/i.test(fs[0].name)) fs[0].text().then(t=>{try{importPlan(JSON.parse(t));}catch(err){toast('読み込めませんでした: '+err.message);}});
@@ -1007,8 +1030,175 @@ $('bCatOut').onclick=()=>{
   setTimeout(()=>URL.revokeObjectURL(a.href),2000); toast('catalog.json を書き出しました');
 };
 
+
+/* ---------------- 背景地図(JourneyMap) ---------------- */
+const MAP = {layers:{}, cur:null, ox:0, oz:0, alpha:.85, show:true, loading:false};
+function saveMapPrefs(){try{localStorage.setItem('citybuilder.map',JSON.stringify({ox:MAP.ox,oz:MAP.oz,alpha:MAP.alpha}));}catch(e){}}
+function loadMapPrefs(){try{const o=JSON.parse(localStorage.getItem('citybuilder.map')||'null');if(o){MAP.ox=Math.round(+o.ox)||0;MAP.oz=Math.round(+o.oz)||0;if(o.alpha>=.1&&o.alpha<=1)MAP.alpha=o.alpha;}}catch(e){}}
+const mapReady=()=>!!(MAP.cur&&MAP.layers[MAP.cur]);
+function drawMap(){
+  const L=MAP.layers[MAP.cur]; if (!L||!MAP.show) return;
+  g.save(); g.globalAlpha=MAP.alpha; g.imageSmoothingEnabled=false;
+  const s=S.view.s, size=512*s;
+  for (const t of L.tiles.values()){
+    const [sx,sy]=w2s(t.rx*512-MAP.ox,t.rz*512-MAP.oz);
+    if (sx>W||sy>H||sx+size<0||sy+size<0) continue;
+    g.drawImage(t.bmp,sx,sy,size,size);
+  }
+  g.restore();
+}
+/* 水面判定: 青みが強いピクセルを水とみなす(JourneyMapの昼の地図で判定) */
+const _mc=document.createElement('canvas'); const _mg=_mc.getContext('2d',{willReadFrequently:true});
+function buildMask(t){
+  if (t.mask) return;
+  const n=t.bmp.width; _mc.width=n; _mc.height=t.bmp.height; _mg.clearRect(0,0,n,t.bmp.height); _mg.drawImage(t.bmp,0,0);
+  const d=_mg.getImageData(0,0,n,t.bmp.height).data, m=new Uint8Array(n*t.bmp.height);
+  for (let i=0,j=0;i<m.length;i++,j+=4){const r=d[j],gg=d[j+1],b=d[j+2],a=d[j+3]; if (a>128&&b>r+25&&b>gg+5&&b>85) m[i]=1;}
+  t.mask=m; t.mw=n; t.mh=t.bmp.height;
+}
+function maskLayerKey(){
+  if (!mapReady()) return null;
+  const pre=MAP.cur.split('/').slice(0,-1).join('/'); // world/dim
+  const day=Object.keys(MAP.layers).find(k=>k===pre+'/day'||(k.startsWith(pre+'/')&&/\/day$/.test(k)));
+  return day||MAP.cur;
+}
+function ensureMasks(){
+  const k=maskLayerKey(); if (!k) return;
+  for (const t of MAP.layers[k].tiles.values()) buildMask(t);
+}
+function waterAt(wx,wz){
+  const k=MAP._mk; const L=k&&MAP.layers[k]; if (!L) return 0;
+  const rx=Math.floor(wx/512), rz=Math.floor(wz/512), t=L.tiles.get(rx+','+rz);
+  if (!t||!t.mask) return -1; // 不明
+  const px=Math.floor((wx-rx*512)*t.mw/512), pz=Math.floor((wz-rz*512)*t.mh/512);
+  return t.mask[pz*t.mw+px];
+}
+/* プラン座標の矩形のうち水面の割合(地図が無い所は無視) */
+function waterFrac(x1,z1,x2,z2,step){
+  if (!mapReady()) return 0;
+  let w=0,n=0;
+  for (let z=z1;z<=z2;z+=step) for (let x=x1;x<=x2;x+=step){const v=waterAt(x+MAP.ox,z+MAP.oz); if (v<0) continue; n++; w+=v;}
+  return n?w/n:0;
+}
+function mapWarnings(add){
+  if (!mapReady()) return;
+  MAP._mk=maskLayerKey();
+  for (const it of S.items){
+    if (it.type==='building'){
+      const f=footprint(it), fr=waterFrac(f.x,f.z,f.x+f.w-1,f.z+f.l-1,1);
+      if (fr>=.2) add(it.id,`地図上で水面にかかっています(約${Math.round(fr*100)}%)。整地・埋め立てが必要です`);
+    } else if (it.type==='area'){
+      if (it.style==='water') continue;
+      const fr=waterFrac(Math.min(it.x1,it.x2),Math.min(it.z1,it.z2),Math.max(it.x1,it.x2),Math.max(it.z1,it.z2),Math.max(1,Math.floor(Math.max(Math.abs(it.x2-it.x1),Math.abs(it.z2-it.z1))/60)));
+      if (fr>=.3) add(it.id,`地図上で水面が約${Math.round(fr*100)}%含まれています`);
+    } else if (it.type==='road'){
+      let w=0,n=0; const hw=Math.floor((it.width-1)/2);
+      for (let i=0;i+1<it.points.length;i++){
+        const [ax,az]=it.points[i],[bx,bz]=it.points[i+1], len=Math.max(1,Math.hypot(bx-ax,bz-az)), st=Math.max(1,Math.floor(len/200));
+        for (let d=0;d<=len;d+=2*st){const x=Math.round(ax+(bx-ax)*d/len),z=Math.round(az+(bz-az)*d/len);
+          const v=waterAt(x+MAP.ox,z+MAP.oz); if (v<0) continue; n++; w+=v;}
+      }
+      if (n&&w/n>=.15) add(it.id,`地図上で道路の約${Math.round(w/n*100)}%が水面を通ります(橋・埋め立てが必要)`);
+    }
+  }
+}
+function warnHtml(s){const w=computeWarnings().get(s.id)||[];return w.map(m=>`<div class="warn">⚠ ${esc(m)}</div>`).join('');}
+
+function parseTilePath(path){
+  const parts=path.replace(/\\/g,'/').split('/').filter(Boolean), name=parts.pop()||'';
+  const m=name.match(/^(-?\d+),(-?\d+)\.png$/i); if (!m) return null;
+  let di=parts.findIndex(p=>/^DIM/i.test(p)), world='', dim='DIM0', layer='day';
+  if (di>=0){dim=parts[di]; world=di>0?parts[di-1]:''; layer=parts.slice(di+1).join('/')||'day';}
+  else if (parts.length){const l=parts[parts.length-1].toLowerCase(); layer=/^(day|night|topo|underground|cave|surface)/.test(l)?parts[parts.length-1]:'day';}
+  return {rx:+m[1],rz:+m[2],key:[world,dim,layer].filter(x=>x!=='').join('/')};
+}
+async function importMapFiles(list){
+  const tiles=[]; let skipped=0;
+  for (const it of list){const p=parseTilePath(it.path||it.file.webkitRelativePath||it.file.name); if (p) tiles.push(Object.assign(p,{file:it.file})); else skipped++;}
+  if (!tiles.length){toast('JourneyMapのタイル(例: 0,0.png)が見つかりませんでした');return;}
+  if (MAP.loading){toast('読み込み中です');return;}
+  MAP.loading=true;
+  const info=$('mapInfo'); let done=0;
+  try{
+    for (let i=0;i<tiles.length;i+=12){
+      await Promise.all(tiles.slice(i,i+12).map(async t=>{
+        try{
+          const bmp=await createImageBitmap(t.file);
+          const L=MAP.layers[t.key]||(MAP.layers[t.key]={tiles:new Map()});
+          L.tiles.set(t.rx+','+t.rz,{rx:t.rx,rz:t.rz,bmp});
+        }catch(e){skipped++;}
+        done++;
+      }));
+      $('mapCtl').style.display=''; info.textContent=`読み込み中… ${done}/${tiles.length}`;
+    }
+  } finally {MAP.loading=false;}
+  // 初期レイヤー: day があれば day、なければ最もタイル数の多いもの
+  const keys=Object.keys(MAP.layers);
+  if (!MAP.cur||!MAP.layers[MAP.cur]) MAP.cur=keys.find(k=>/\/day$|^day$/.test(k))||keys.sort((a,b)=>MAP.layers[b].tiles.size-MAP.layers[a].tiles.size)[0];
+  ensureMasks(); syncMapUI(); mapFit(); draw();
+  toast(`地図を読み込みました: ${tiles.length-skipped} タイル${skipped?`(${skipped} 件スキップ)`:''}`);
+}
+function mapBounds(){
+  const L=MAP.layers[MAP.cur]; if (!L||!L.tiles.size) return null;
+  let a=1e9,b=1e9,c=-1e9,d=-1e9;
+  for (const t of L.tiles.values()){a=Math.min(a,t.rx);b=Math.min(b,t.rz);c=Math.max(c,t.rx);d=Math.max(d,t.rz);}
+  return {x1:a*512,z1:b*512,x2:(c+1)*512,z2:(d+1)*512,n:L.tiles.size};
+}
+function mapFit(){
+  const b=mapBounds(); if (!b||!W) return;
+  const x1=b.x1-MAP.ox,x2=b.x2-MAP.ox,z1=b.z1-MAP.oz,z2=b.z2-MAP.oz;
+  S.view.x=(x1+x2)/2; S.view.z=(z1+z2)/2; S.view.s=clamp(Math.min(W/(x2-x1),H/(z2-z1)),0.1,24); draw();
+}
+function syncMapUI(){
+  const has=Object.keys(MAP.layers).length>0;
+  $('mapCtl').style.display=has?'':'none'; $('bMapClear').style.display=has?'':'none';
+  const sel=$('mapLayer'); sel.innerHTML=Object.keys(MAP.layers).map(k=>`<option value="${esc(k)}" ${k===MAP.cur?'selected':''}>${esc(k)} (${MAP.layers[k].tiles.size})</option>`).join('');
+  $('mapAlpha').value=Math.round(MAP.alpha*100); $('mapShow').checked=MAP.show;
+  $('mapOx').value=MAP.ox; $('mapOz').value=MAP.oz;
+  const b=mapBounds();
+  $('mapInfo').innerHTML=b?`ワールド座標 X ${b.x1}〜${b.x2} / Z ${b.z1}〜${b.z2}(${b.n} タイル)<br>原点 = プランの座標(0,0)に対応するワールド座標。実際に <code>plan load</code> する場所(立つ場所)と同じにしてください。`:'';
+  syncCmd();
+}
+function clearMap(){
+  for (const k in MAP.layers) for (const t of MAP.layers[k].tiles.values()) try{t.bmp.close();}catch(e){}
+  MAP.layers={}; MAP.cur=null; MAP._mk=null; syncMapUI(); draw();
+}
+$('bMap').onclick=()=>$('fMapDir').click();
+$('bMapPng').onclick=()=>$('fMapPng').click();
+$('fMapDir').onchange=e=>{const fs=[...e.target.files].map(f=>({file:f,path:f.webkitRelativePath||f.name}));e.target.value='';if(fs.length)importMapFiles(fs);};
+$('fMapPng').onchange=e=>{const fs=[...e.target.files].map(f=>({file:f,path:f.name}));e.target.value='';if(fs.length)importMapFiles(fs);};
+$('bMapClear').onclick=clearMap;
+$('mapLayer').onchange=e=>{MAP.cur=e.target.value;ensureMasks();syncMapUI();draw();};
+$('mapAlpha').oninput=e=>{MAP.alpha=clamp(+e.target.value/100,.1,1);saveMapPrefs();draw();};
+$('mapShow').onchange=e=>{MAP.show=e.target.checked;draw();};
+$('mapFit').onclick=mapFit;
+const setOrigin=(x,z)=>{MAP.ox=Math.round(x);MAP.oz=Math.round(z);saveMapPrefs();syncMapUI();draw();};
+$('mapOx').onchange=e=>setOrigin(+e.target.value||0,MAP.oz);
+$('mapOz').onchange=e=>setOrigin(MAP.ox,+e.target.value||0);
+$('mapPick').onclick=()=>{S.pickOrigin=true;toast('原点にしたい場所を地図上でクリック(Escで中止)');draw();};
+/* フォルダのドロップ: DataTransferItem のエントリを再帰的に辿る */
+function entryFiles(entry,base){
+  return new Promise(res=>{
+    if (entry.isFile){entry.file(f=>res([{file:f,path:base+entry.name}]),()=>res([]));return;}
+    const rd=entry.createReader(), out=[];
+    const next=()=>rd.readEntries(async es=>{
+      if (!es.length){res(out);return;}
+      for (const e of es) out.push(...await entryFiles(e,base+entry.name+'/'));
+      next();
+    },()=>res(out));
+    next();
+  });
+}
+async function importMapEntries(entries,files){
+  let list=[];
+  if (entries&&entries.length) for (const en of entries) list.push(...await entryFiles(en,''));
+  else list=files.map(f=>({file:f,path:f.name}));
+  importMapFiles(list.filter(x=>/\.png$/i.test(x.file.name)));
+}
+loadMapPrefs(); syncMapUI();
+
 /* ---------------- 起動 ---------------- */
-window.PLANNER = {importSchems, S, addItem, setTool, fitView, exportPlan, importPlan, CAT:()=>CAT, draw};
+window.PLANNER = {MAP, importMapFiles, waterAt, importSchems, S, addItem, setTool, fitView, exportPlan, importPlan, CAT:()=>CAT, draw};
 BASE=CATALOG;
 try{const c=JSON.parse(localStorage.getItem('citybuilder.custom')||'[]');if(Array.isArray(c))CUSTOM=c.filter(x=>x&&x.id&&Array.isArray(x.size)&&x.top);}catch(e){}
 applyCatalog();

@@ -21,6 +21,7 @@ public final class CityBuilderScreen extends Screen {
     private static int tab = 0;
     private static int catIdx = 0;
     private static int page = 0;
+    private static String selPlan = null;
 
     private final List<ClientCatalog.Entry> shown = new ArrayList<>();
     private final List<int[]> rects = new ArrayList<>();
@@ -55,8 +56,9 @@ public final class CityBuilderScreen extends Screen {
         tabButton(left, "建物", 0);
         tabButton(left + 64, "道路", 1);
         tabButton(left + 128, "区画", 2);
+        tabButton(left + 192, "プラン", 3);
 
-        addDrawableChild(new ButtonWidget(left + 192, 22, 80, 20, Text.literal("アップロード"), b -> client.setScreen(new UploadScreen(this))));
+        addDrawableChild(new ButtonWidget(left + 258, 22, 80, 20, Text.literal("アップロード"), b -> client.setScreen(new UploadScreen(this))));
         addDrawableChild(new ButtonWidget(width - 110, 22, 100, 20, Text.literal("元に戻す(undo)"), b ->
                 ClientPlayNetworking.send(NetIds.UNDO, PacketByteBufs.create())));
         addDrawableChild(new ButtonWidget(width - 220, 22, 100, 20, Text.literal("カタログ更新"), b ->
@@ -64,7 +66,8 @@ public final class CityBuilderScreen extends Screen {
 
         if (tab == 0) initBuildings();
         else if (tab == 1) initRoad();
-        else initArea();
+        else if (tab == 2) initArea();
+        else initPlans();
     }
 
     private void initBuildings() {
@@ -142,6 +145,50 @@ public final class CityBuilderScreen extends Screen {
         }));
     }
 
+    private static void planAction(int action, String name) {
+        net.minecraft.network.PacketByteBuf b = PacketByteBufs.create();
+        b.writeByte(action);
+        b.writeString(name == null ? "" : name, 64);
+        ClientPlayNetworking.send(NetIds.PLAN_ACTION, b);
+    }
+
+    /** 街の計画(WebUIの city.json)。サーバー上のプランを選んで、プレビュー→確定する。 */
+    private void initPlans() {
+        List<String> plans = ClientCatalog.plans;
+        int perPage = Math.max(3, (height - 50 - 40) / 22);
+        int pages = Math.max(1, (plans.size() + perPage - 1) / perPage);
+        if (page >= pages) page = pages - 1;
+        int y = 50;
+        for (int i = page * perPage; i < Math.min(plans.size(), (page + 1) * perPage); i++) {
+            final String n = plans.get(i);
+            addDrawableChild(new ButtonWidget(10, y, 230, 20, Text.literal((n.equals(selPlan) ? "▶ " : "") + n), b -> {
+                selPlan = n;
+                rebuild();
+            }));
+            y += 22;
+        }
+        if (pages > 1) {
+            int py = height - 28;
+            addDrawableChild(new ButtonWidget(10, py, 40, 20, Text.literal("◀"), b -> { if (page > 0) { page--; rebuild(); } }));
+            addDrawableChild(new ButtonWidget(200, py, 40, 20, Text.literal("▶"), b -> { if (page < pages - 1) { page++; rebuild(); } }));
+        }
+        int x = 260, w = 220;
+        addDrawableChild(new ButtonWidget(x, 60, w, 20, Text.literal("① 足元を原点にプレビュー"), b -> {
+            if (selPlan == null) return;
+            planAction(0, selPlan);
+            close();
+        }));
+        addDrawableChild(new ButtonWidget(x, 86, w, 20, Text.literal("② 確定して建築"), b -> {
+            planAction(1, selPlan);
+            close();
+        }));
+        addDrawableChild(new ButtonWidget(x, 112, w, 20, Text.literal("プレビューを取り消す"), b -> {
+            planAction(2, "");
+            PlanPreview.clear();
+        }));
+        addDrawableChild(new ButtonWidget(x, 148, w, 20, Text.literal("city.json をアップロード…"), b -> client.setScreen(new UploadScreen(this))));
+    }
+
     private void initArea() {
         int x = 130, y = 60;
         List<String> styles = new ArrayList<>(Styles.AREAS.keySet());
@@ -188,6 +235,15 @@ public final class CityBuilderScreen extends Screen {
                     y += 11;
                 }
             }
+        } else if (tab == 3) {
+            textRenderer.draw(m, Text.literal("§7サーバーにあるプラン(WebUIで作った city.json)"), 10, 38, 0xAAAAAA);
+            if (ClientCatalog.plans.isEmpty()) {
+                textRenderer.draw(m, Text.literal("§7(まだありません。右の「アップロード」から送れます)"), 14, 54, 0xAAAAAA);
+            }
+            textRenderer.draw(m, Text.literal(selPlan == null ? "§7左のリストからプランを選択" : "§e選択中: §f" + selPlan), 260, 44, 0xFFFFFF);
+            textRenderer.draw(m, Text.literal("§7プレビューの黄色い枠が街の範囲です。位置を確認してから確定。"), 260, 176, 0xAAAAAA);
+            textRenderer.draw(m, Text.literal("§7原点は『今立っているブロック』。やり直すには場所を変えて再プレビュー。"), 260, 188, 0xAAAAAA);
+            if (PlanPreview.active()) textRenderer.draw(m, Text.literal("§aプレビュー中: " + PlanPreview.name + " (" + PlanPreview.summary + ")"), 260, 204, 0xFFFFFF);
         } else if (tab == 1) {
             textRenderer.draw(m, Text.literal("右クリック: 点を追加 / 同じ点をもう一度右クリック: 確定(2点以上)"), 130, 190, 0xCCCCCC);
             textRenderer.draw(m, Text.literal("道路幅は奇数が左右対称になります。歩道(幅2)は自動で付きます。"), 130, 202, 0xAAAAAA);

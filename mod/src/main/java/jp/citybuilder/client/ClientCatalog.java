@@ -13,7 +13,7 @@ import java.util.Set;
 /** サーバーから受け取った建物カタログ(ブロックデータは持たない) */
 public final class ClientCatalog {
     public static final class Entry {
-        public String id, name, category, description;
+        public String id, name, category, description, author;
         public int floors, w, h, l;
         /** 使われている建材 {ブロックID, 個数}(多い順) */
         public final List<Object[]> materials = new ArrayList<>();
@@ -24,6 +24,7 @@ public final class ClientCatalog {
     public static boolean canBuild = false;
     public static int maxDistance = 160;
     public static boolean canUpload = false;
+    public static List<String> plans = new ArrayList<>();
     public static int maxUploadBytes = 2_000_000;
 
     private ClientCatalog() {}
@@ -35,6 +36,9 @@ public final class ClientCatalog {
             maxDistance = root.has("maxDistance") ? root.get("maxDistance").getAsInt() : 160;
             canUpload = root.has("canUpload") && root.get("canUpload").getAsBoolean();
             maxUploadBytes = root.has("maxUploadBytes") ? root.get("maxUploadBytes").getAsInt() : 2_000_000;
+            List<String> pl = new ArrayList<>();
+            if (root.has("plans")) for (JsonElement pe : root.getAsJsonArray("plans")) pl.add(pe.getAsString());
+            plans = pl;
             List<Entry> list = new ArrayList<>();
             Set<String> cats = new LinkedHashSet<>();
             JsonArray arr = root.getAsJsonArray("buildings");
@@ -45,6 +49,7 @@ public final class ClientCatalog {
                 e.name = o.get("name").getAsString();
                 e.category = o.get("category").getAsString();
                 e.description = o.has("description") ? o.get("description").getAsString() : "";
+                e.author = o.has("author") ? o.get("author").getAsString() : null;
                 e.floors = o.has("floors") ? o.get("floors").getAsInt() : 0;
                 JsonArray sz = o.getAsJsonArray("size");
                 e.w = sz.get(0).getAsInt();

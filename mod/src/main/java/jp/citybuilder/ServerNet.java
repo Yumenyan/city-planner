@@ -41,14 +41,25 @@ public final class ServerNet {
             }
         });
 
+        ServerPlayNetworking.registerGlobalReceiver(NetIds.PLAN_ACTION, (server, player, handler, buf, sender) -> {
+            try {
+                int action = buf.readByte();
+                String name = buf.readString(64);
+                server.execute(() -> PlanSessions.onAction(player, action, name));
+            } catch (RuntimeException e) {
+                CityBuilderMod.LOG.warn("不正な plan_action パケット: {}", e.toString());
+            }
+        });
+
         ServerPlayNetworking.registerGlobalReceiver(NetIds.UPLOAD_BEGIN, (server, player, handler, buf, sender) -> {
             try {
+                String kind = buf.readString(8);
                 String id = buf.readString(64);
                 String name = buf.readString(64);
                 String category = buf.readString(32);
                 String desc = buf.readString(200);
                 int total = buf.readVarInt();
-                server.execute(() -> UploadManager.begin(player, id, name, category, desc, total));
+                server.execute(() -> UploadManager.begin(player, kind, id, name, category, desc, total));
             } catch (RuntimeException e) {
                 CityBuilderMod.LOG.warn("不正な upload_begin パケット: {}", e.toString());
             }
@@ -99,8 +110,16 @@ public final class ServerNet {
 
     public static void sendCatalog(ServerPlayerEntity p) {
         CityConfig c = CityBuilderMod.config();
-        String json = CityBuilderMod.catalog().toClientJson(PlacementValidator.canUse(p), c.maxPlaceDistance,
-                PlacementValidator.canUpload(p), c.maxUploadBytes);
+        boolean use = PlacementValidator.canUse(p);
+        java.util.List<String> plans = use ? PlanLoader.list() : null;
+        if (plans != null && plans.size() > 300) plans = plans.subList(0, 300);
+        String json = CityBuilderMod.catalog().toClientJson(use, c.maxPlaceDistance,
+                PlacementValidator.canUpload(p), c.maxUploadBytes, true, plans);
+        // S2Cパケットは約1MBまで。大きすぎる場合は建材一覧を省いて小さくする
+        if (json.length() > 700_000) {
+            json = CityBuilderMod.catalog().toClientJson(use, c.maxPlaceDistance,
+                    PlacementValidator.canUpload(p), c.maxUploadBytes, false, plans);
+        }
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeByteArray(json.getBytes(StandardCharsets.UTF_8));
         ServerPlayNetworking.send(p, NetIds.CATALOG, buf);

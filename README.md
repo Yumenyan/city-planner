@@ -44,7 +44,7 @@ cd mod
 gradle wrapper --gradle-version 7.6   # 初回のみ
 ./gradlew build
 ```
-`mod/build/libs/citybuilder-1.1.0.jar` ができます。(IntelliJ IDEA で `mod/` を開いて Gradle の `build` を実行でも可)
+`mod/build/libs/citybuilder-1.2.0.jar` ができます。(IntelliJ IDEA で `mod/` を開いて Gradle の `build` を実行でも可)
 
 ### 2. サーバー
 1. Fabric Loader 0.14.x + Fabric API 0.77.0+1.19.2 を入れた 1.19.2 サーバーに jar を入れる
@@ -82,6 +82,7 @@ gradle wrapper --gradle-version 7.6   # 初回のみ
 /citybuilder plan load <名前> [x y z]       WebUIで作った計画の範囲をプレビュー(まだ建てない)
 /citybuilder plan confirm                  プレビューを確定して施工(チャットの[確定して建築]でも可)
 /citybuilder plan cancel                   プレビューを取り消す
+/citybuilder remove <id>                    アップロードされた建物を削除(本人かOPレベル3)
 /citybuilder undo                          直前の作業を元に戻す(プレイヤーごとに履歴)
 /citybuilder cancel                        自分の作業キューを中止
 /citybuilder status
@@ -100,13 +101,31 @@ gradle wrapper --gradle-version 7.6   # 初回のみ
 
 サンプル: `server-data/citybuilder/plans/city01.json`(大通り+マンション・オフィス街+駅・商業)。WebUI の「読み込み…」で開けます。
 
+#### 背景地図(JourneyMap)と地形に合わせた計画(WebUI)
+JourneyMap で探索した地図を WebUI の背景に敷けます(Mod の更新は不要)。
+1. JourneyMap のデータフォルダを開く: `.minecraft/journeymap/data/sp/<ワールド名>/DIM0/`(マルチは `mp/<サーバー名>/DIM0/`)。中の `day`(昼の地図)に `0,0.png` `1,0.png` … のタイルが入っています
+2. WebUI の右側「背景地図」→「地図フォルダを選ぶ…」でそのフォルダ(`DIM0` でも `day` でも可)を選ぶ。**フォルダごと画面にドロップ**でも可。昼・夜・地形図などのレイヤーはプルダウンで切り替え
+3. **原点を決める**: 「地図をクリックして原点を決める」で、街の原点(プランの座標 0,0)にしたい場所をクリック。数値(ワールドX/Z)の直接入力も可。フッターにはマウス位置のワールド座標も出ます
+4. 水面にかかる建物・道路・区画には警告が出ます(地図の青い部分を水面とみなす簡易判定)
+5. 書き出したプランを使うときは、**原点と同じ場所**に立ってプレビューしてください。原点を指定した場合、WebUIの「座標を指定する場合」のコマンドが `plan load 名前 <X> ~-1 <Z>` になります(`~-1` は足元の高さ)
+JourneyMap が保存しているのは探索済みの範囲だけです。地図は読み込み直しが必要です(ブラウザには保存しません。原点と濃さだけ記憶します)。タイルが数百枚あるとメモリを使うので、必要な範囲だけ読み込むと軽く動きます。
+
 #### 建材の変更(WebUI)
 建物を選択(または配置中)すると、右のインスペクタに「建材」欄が出ます。元の建材 → 置き換え先のブロックID(例: `white_concrete` → `light_gray_concrete`)を入力すると、キャンバスのサムネイルの色も変わります。
 `city.json` の建物項目に `"materials": {"white_concrete": "light_gray_concrete"}` として保存され、`plan load` で反映されます。チェスト等のブロックエンティティを持つブロックへの置き換えはサーバーが拒否します(その建物はスキップ)。
 
 ## 自作の建物を増やす(jar の更新は不要)
 
-### 方法A(おすすめ): ゲーム内からアップロード
+### 街の計画(city.json)をマルチサーバーで使う
+**サーバー管理者にJSONを渡す必要はありません。**
+1. WebUIで「city.json をダウンロード」(ブラウザの「ダウンロード」フォルダに保存される)
+2. ゲーム内で **B →「プラン」タブ →「city.json をアップロード…」**(または「アップロード」ボタン)。一覧にはダウンロードフォルダの city.json が自動で出ます。ドラッグ&ドロップも可
+3. 送信が終わるとサーバーが検証・保存し、**足元を原点として範囲プレビュー(黄色い枠)**がすぐ出ます(プラン名の前にあなたのプレイヤー名が付きます)
+4. 位置が良ければ **B →「プラン」→「② 確定して建築」**(またはチャットの [確定して建築] / `/citybuilder plan confirm`)
+5. 位置を変えたいときは、場所を移動して「① 足元を原点にプレビュー」をやり直す。保存済みのプランは「プラン」タブの一覧からいつでも選べます
+アップロードにはアップロード権限(`uploadPermissionLevel` または `allowedPlayers`)が必要です。
+
+### 方法A(おすすめ): ゲーム内から建物(.schem)をアップロード
 サーバー管理者に `.schem` を渡さなくても、権限のあるプレイヤーが自分で登録できます。
 1. `.schem` を `<ゲームフォルダ>/citybuilder_upload/`(または `schematics/`、`config/worldedit/schematics/`)に置く
 2. ゲーム内で **B → 「アップロード」**。一覧から選ぶ(ウィンドウへのドラッグ&ドロップでも可)
@@ -137,6 +156,11 @@ gradle wrapper --gradle-version 7.6   # 初回のみ
 | `maxPlaceDistance` | 160 | プレイヤーから配置先までの最大距離 |
 | `blocksPerTick` | 4000 | 1tickで処理するブロック数 |
 | `cooldownTicks` | 10 | 連打防止 |
+| `maxMsPerTick` | 30 | 1tickに建築へ使う最大ミリ秒(ラグ防止) |
+| `maxJobsPerPlayer` | 6 | 1人が同時に積める作業数 |
+| `historyMaxBlocks` | 4,000,000 | 1人あたりのundo履歴の合計ブロック数上限(メモリ保護) |
+| `maxUploadedTemplates` / `maxPlanItems` | 300 / 5000 | アップロード建物の最大数 / プランの最大項目数 |
+| `uploadCooldownTicks` | 40 | アップロード開始の最小間隔 |
 | `allowUpload` | true | クライアントからの `.schem` アップロードを許可 |
 | `uploadPermissionLevel` | 2 | アップロードに必要なOPレベル(`allowedPlayers` は免除) |
 | `maxUploadBytes` | 2,000,000 | アップロードできるファイルの最大サイズ |
@@ -147,6 +171,13 @@ gradle wrapper --gradle-version 7.6   # 初回のみ
 | `allowedDimensions` | ["minecraft:overworld"] | 建築を許すディメンション |
 | `buildAreas` | [] | 空でなければ、この範囲内のみ建築可。`{"x1":0,"z1":0,"x2":999,"z2":999}` の配列 |
 | `protectedAreas` | [] | 建築禁止範囲(同形式) |
+
+## マルチプレイでの動作
+- **サーバーにだけ Mod を入れても**、バニラのクライアントはコマンドで使えます。GUI・プレビュー・アップロードはクライアントにも Mod が必要です
+- 建築は**プレイヤーごとのキューを順番に処理**するので、1人が巨大な街を頼んでも他の人の作業が止まりません。1tickの処理時間にも上限があり(`maxMsPerTick`)、ラグを抑えます
+- 建築中にエラーが起きてもサーバーは落ちず、その作業だけ中止されます(途中までは `undo` で戻せます)
+- 範囲は `buildAreas` / `protectedAreas` で制限できます。**既定ではワールド全体に建てられる**ので、一般プレイヤーに権限を渡すときは `buildAreas` を設定してください
+- アップロードされた建物には作成者名が記録されます。不要になったものは `/citybuilder remove <id>`
 
 ## サーバー側の検証(クライアントを信用しない)
 権限 / ゲームモード / 連打 / 建材の置き換え指定(ブロックの存在・ブロックエンティティ不可・最大24件) / テンプレートID(カタログにあるものだけ) / 回転値 / ディメンション / 高さ範囲 / 体積 / 距離 / 建築可能範囲 / 保護区域 / キュー上限。

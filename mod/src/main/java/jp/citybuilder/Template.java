@@ -149,7 +149,8 @@ public final class Template {
         for (int i = 0; i < palette.length; i++) if (palette[i] == null) palette[i] = Blocks.AIR.getDefaultState();
 
         long total = (long) w * h * l;
-        if (total > 50_000_000L) throw new IOException("テンプレートが大きすぎます");
+        long cap = Math.min(50_000_000L, Math.max(100_000L, CityBuilderMod.config() == null ? 2_000_000L : CityBuilderMod.config().maxVolume));
+        if (total > cap) throw new IOException("テンプレートが大きすぎます(最大 " + cap + " ブロック)");
         int[] data = new int[(int) total];
         int p = 0;
         for (int i = 0; i < data.length; i++) {

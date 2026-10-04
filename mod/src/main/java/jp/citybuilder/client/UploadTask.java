@@ -27,8 +27,9 @@ public final class UploadTask {
         return data == null ? "" : label + " を送信中 " + (pos * 100L / data.length) + "% (" + pos / 1000 + "/" + data.length / 1000 + " KB)";
     }
 
-    public static void start(String id, String name, String category, String desc, byte[] bytes) {
+    public static void start(String kind, String id, String name, String category, String desc, byte[] bytes) {
         PacketByteBuf b = PacketByteBufs.create();
+        b.writeString(kind, 8);
         b.writeString(id, 64);
         b.writeString(name, 64);
         b.writeString(category, 32);

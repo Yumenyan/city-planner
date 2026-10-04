@@ -12,6 +12,7 @@ public final class NetIds {
     public static final Identifier UPLOAD_BEGIN = new Identifier("citybuilder", "upload_begin");
     public static final Identifier UPLOAD_CHUNK = new Identifier("citybuilder", "upload_chunk");
     public static final Identifier PLAN_PREVIEW = new Identifier("citybuilder", "plan_preview");
+    public static final Identifier PLAN_ACTION = new Identifier("citybuilder", "plan_action");
     public static final Identifier UNDO = new Identifier("citybuilder", "undo");
 
     private NetIds() {}

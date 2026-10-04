@@ -5,7 +5,14 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
 
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.math.BlockPos;
+
 import java.io.IOException;
+import java.util.function.Consumer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,5 +89,54 @@ public final class PlanSessions {
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeBoolean(false);
         ServerPlayNetworking.send(p, NetIds.PLAN_PREVIEW, buf);
+    }
+
+    /** プランを検証してプレビューを出す(まだ建てない)。コマンド・GUI・アップロードの共通処理。 */
+    public static boolean preview(ServerWorld w, ServerPlayerEntity p, String name, BlockPos origin,
+                                  Consumer<Text> out, Consumer<String> err) {
+        try {
+            PlanLoader.Prepared pr = PlanLoader.prepare(w, p, name, origin);
+            PlanLoader.Result r = pr.result;
+            for (String e : r.errors) err.accept("  スキップ " + e);
+            if (pr.jobs.isEmpty()) { err.accept("実行できる項目がありません (" + r.skipped + " 件をスキップ)"); return false; }
+            put(p, pr);
+            String range = r.bounds == null ? "" : " / 範囲 X " + r.bounds[0] + "〜" + r.bounds[2] + ", Z " + r.bounds[1] + "〜" + r.bounds[3]
+                    + " (" + (r.bounds[2] - r.bounds[0] + 1) + "x" + (r.bounds[3] - r.bounds[1] + 1) + ")";
+            out.accept(Text.literal("プラン '" + name + "' のプレビュー: 建物 " + r.buildings + " / 道路 " + r.roads + " / 区画 " + r.areas
+                    + " (スキップ " + r.skipped + ") / 約 " + r.estimate + " ブロック / 原点 " + origin.toShortString() + range));
+            Text confirm = Text.literal("[確定して建築]").styled(st -> st.withColor(Formatting.GREEN).withBold(true)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citybuilder plan confirm")));
+            Text cancel = Text.literal("[取り消し]").styled(st -> st.withColor(Formatting.RED)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citybuilder plan cancel")));
+            out.accept(Text.literal("黄色の枠が街の範囲です(青=建物 白=道路 緑=区画)。 ").append(confirm).append(Text.literal(" ")).append(cancel)
+                    .append(Text.literal(" ※3分で失効 / B→プランタブからも操作できます")));
+            return true;
+        } catch (IOException e) {
+            err.accept(e.getMessage());
+            return false;
+        }
+    }
+
+    /** GUI(パケット)からのプラン操作。0=足元を原点にプレビュー 1=確定 2=取り消し */
+    public static void onAction(ServerPlayerEntity p, int action, String name) {
+        if (!PlacementValidator.canUse(p)) { CityActions.reply(p, "権限がありません", false); return; }
+        Consumer<Text> out = t -> p.sendMessage(t, false);
+        Consumer<String> err = e -> p.sendMessage(Text.literal("§c[CityBuilder] " + e), false);
+        UUID owner = p.getUuid();
+        if (action == 0) {
+            if (!PlanLoader.validName(name)) { CityActions.reply(p, "プラン名が不正です", false); return; }
+            preview((ServerWorld) p.world, p, name, p.getBlockPos().down(), out, err);
+        } else if (action == 1) {
+            String e = PlacementValidator.checkPlayerRequest(p);
+            if (e != null) { CityActions.reply(p, e, false); return; }
+            try {
+                PlanLoader.Prepared pr = confirm(p, owner, p.getServer().getTicks());
+                CityActions.reply(p, "プラン '" + pr.name + "' を開始(undo 1回で一括して戻せます)", true);
+            } catch (IOException ex) {
+                CityActions.reply(p, ex.getMessage(), false);
+            }
+        } else if (action == 2) {
+            CityActions.reply(p, cancel(p, owner) ? "プレビューを取り消しました" : "保留中のプランはありません", true);
+        }
     }
 }

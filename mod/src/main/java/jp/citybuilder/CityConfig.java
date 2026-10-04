@@ -29,6 +29,18 @@ public final class CityConfig {
     public int cooldownTicks = 10;
     /** 1回の配置で許す最大体積 */
     public int maxVolume = 2_000_000;
+    /** 1tickに建築へ使う最大時間(ミリ秒)。超えると残りは次tickへ(サーバーのラグ防止) */
+    public int maxMsPerTick = 30;
+    /** 1人が同時に積める作業の数 */
+    public int maxJobsPerPlayer = 6;
+    /** 1人あたりの undo 履歴の合計ブロック数の上限(メモリ保護) */
+    public long historyMaxBlocks = 4_000_000L;
+    /** アップロードされた建物の最大登録数 */
+    public int maxUploadedTemplates = 300;
+    /** アップロードできるプランの最大項目数 */
+    public int maxPlanItems = 5000;
+    /** 同じプレイヤーのアップロード開始の最小間隔(tick) */
+    public int uploadCooldownTicks = 40;
     /** キューに溜められる最大ブロック数 */
     public long maxPendingBlocks = 5_000_000L;
     /** /citybuilder undo で戻せる回数(プレイヤーごと) */
@@ -83,6 +95,10 @@ public final class CityConfig {
         c.blocksPerTick = Math.max(100, c.blocksPerTick);
         c.maxPlaceDistance = Math.max(8, Math.min(512, c.maxPlaceDistance));
         c.historyDepth = Math.max(0, c.historyDepth);
+        c.maxMsPerTick = Math.max(5, Math.min(45, c.maxMsPerTick));
+        c.maxJobsPerPlayer = Math.max(1, c.maxJobsPerPlayer);
+        c.historyMaxBlocks = Math.max(100_000L, c.historyMaxBlocks);
+        c.maxPlanItems = Math.max(10, Math.min(50_000, c.maxPlanItems));
         c.maxUploadBytes = Math.max(10_000, Math.min(16_000_000, c.maxUploadBytes));
         try (Writer w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
             gson.toJson(c, w); // 欠けている項目を既定値で書き戻す

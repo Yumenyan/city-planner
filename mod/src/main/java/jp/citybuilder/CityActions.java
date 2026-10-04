@@ -42,7 +42,8 @@ public final class CityActions {
                 pos.getX() + rw - 1, pos.getY() + t.h - 1, pos.getZ() + rl - 1);
         if (err != null) return err;
         if (t.volume() > CityBuilderMod.config().maxVolume) return "建物が大きすぎます";
-        if (!CityBuilderMod.jobs().canAccept(t.volume())) return "作業キューが一杯です。完了を待ってください";
+        String qe = CityBuilderMod.jobs().check(ownerOf(p), t.volume());
+        if (qe != null) return qe;
         CityConfig c = CityBuilderMod.config();
         CityBuilderMod.jobs().submit(new TemplateJob(ownerOf(p), w, t, pos, rot, c.templateFoundation, c.foundationDepth, mat));
         return null;
@@ -62,7 +63,8 @@ public final class CityActions {
         if (err != null) return err;
         long area = (long) (b[2] - b[0] + 1) * (b[3] - b[1] + 1);
         if (area > c.maxVolume) return "道路の範囲が大きすぎます";
-        if (!CityBuilderMod.jobs().canAccept(area)) return "作業キューが一杯です。完了を待ってください";
+        String qe = CityBuilderMod.jobs().check(ownerOf(p), area);
+        if (qe != null) return qe;
         CityBuilderMod.jobs().submit(new RoadJob(ownerOf(p), w, px, pz, width, sidewalk, style, lines, y,
                 c.roadClearAbove, c.roadFoundation, c.foundationDepth));
         return null;
@@ -76,7 +78,8 @@ public final class CityActions {
         if (err != null) return err;
         long area = (long) (ax2 - ax1 + 1) * (az2 - az1 + 1);
         if (area > CityBuilderMod.config().maxVolume) return "区画が大きすぎます";
-        if (!CityBuilderMod.jobs().canAccept(area)) return "作業キューが一杯です。完了を待ってください";
+        String qe = CityBuilderMod.jobs().check(ownerOf(p), area);
+        if (qe != null) return qe;
         CityConfig c = CityBuilderMod.config();
         CityBuilderMod.jobs().submit(new AreaJob(ownerOf(p), w, ax1, az1, ax2, az2, y, block,
                 c.roadClearAbove, c.roadFoundation, c.foundationDepth));

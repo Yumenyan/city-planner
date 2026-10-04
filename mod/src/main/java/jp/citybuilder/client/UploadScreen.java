@@ -55,15 +55,33 @@ public final class UploadScreen extends Screen {
         return l;
     }
 
+    private static boolean isPlan(Path p) { return p.getFileName().toString().toLowerCase().endsWith(".json"); }
+
+    /** WebUIが書き出した city.json かどうか(先頭に "items" がある .json だけを候補にする) */
+    private static boolean looksLikePlan(Path p) {
+        try {
+            if (Files.size(p) > 4_000_000L) return false;
+            try (java.io.InputStream in = Files.newInputStream(p)) {
+                String head = new String(in.readNBytes(2048), java.nio.charset.StandardCharsets.UTF_8);
+                return head.contains("\"items\"") && head.contains("\"version\"");
+            }
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     private static List<Path> scan() {
         List<Path> r = new ArrayList<>(DROPPED);
         try { Files.createDirectories(dropFolder()); } catch (IOException ignored) {}
-        for (Path d : folders()) {
+        List<Path> dirs = folders();
+        dirs.add(Path.of(System.getProperty("user.home", "."), "Downloads")); // ブラウザの保存先
+        for (Path d : dirs) {
             if (!Files.isDirectory(d)) continue;
             try (Stream<Path> s = Files.list(d)) {
-                s.filter(p -> p.getFileName().toString().toLowerCase().endsWith(".schem")).sorted().forEach(p -> {
-                    if (!r.contains(p)) r.add(p);
-                });
+                s.filter(p -> {
+                    String n = p.getFileName().toString().toLowerCase();
+                    return n.endsWith(".schem") || (n.endsWith(".json") && looksLikePlan(p));
+                }).sorted().forEach(p -> { if (!r.contains(p)) r.add(p); });
             } catch (IOException ignored) {}
         }
         return r;
@@ -80,6 +98,7 @@ public final class UploadScreen extends Screen {
         String fn = p.getFileName().toString();
         String stem = fn.contains(".") ? fn.substring(0, fn.lastIndexOf('.')) : fn;
         idText = sanitize(stem).toLowerCase();
+        if (isPlan(p) && idText.length() > 40) idText = idText.substring(0, 40);
         nameText = stem;
         rebuild();
     }
@@ -94,13 +113,13 @@ public final class UploadScreen extends Screen {
     public void filesDragged(List<Path> paths) {
         Path last = null;
         for (Path p : paths) {
-            if (p.getFileName().toString().toLowerCase().endsWith(".schem")) {
+            if (p.getFileName().toString().toLowerCase().endsWith(".schem") || (isPlan(p) && looksLikePlan(p))) {
                 if (!DROPPED.contains(p)) DROPPED.add(p);
                 last = p;
             }
         }
         if (last != null) select(last);
-        else status = "§c.schem ファイルをドロップしてください";
+        else status = "§c.schem か、WebUIで書き出した city.json をドロップしてください";
     }
 
     @Override
@@ -133,6 +152,8 @@ public final class UploadScreen extends Screen {
         fName = field(x, 100, fw, "表示名", nameText);
         fCat = field(x, 140, fw, "カテゴリ", catText);
         fDesc = field(x, 180, fw, "説明", descText);
+        boolean plan = selected != null && isPlan(selected);
+        fName.setEditable(!plan); fCat.setEditable(!plan); fDesc.setEditable(!plan);
         fId.setMaxLength(48); fName.setMaxLength(40); fCat.setMaxLength(20); fDesc.setMaxLength(120);
         addDrawableChild(new ButtonWidget(x, 210, fw, 20, Text.literal("アップロード"), b -> send()));
         addDrawableChild(new ButtonWidget(x, height - 30, 80, 20, Text.literal("戻る"), b -> client.setScreen(parent)));
@@ -155,8 +176,9 @@ public final class UploadScreen extends Screen {
     private void send() {
         saveFields();
         if (!ClientCatalog.canUpload) { status = "§cこのサーバーではアップロードできません(権限または設定)"; return; }
-        if (selected == null) { status = "§c.schem ファイルを選んでください"; return; }
-        if (!ID_RE.matcher(idText).matches()) { status = "§cIDは半角英数字と _ - の48文字以内にしてください"; return; }
+        if (selected == null) { status = "§cファイルを選んでください"; return; }
+        boolean plan = isPlan(selected);
+        if (!ID_RE.matcher(idText).matches() || (plan && idText.length() > 40)) { status = "§cIDは半角英数字と _ - の48文字以内にしてください"; return; }
         if (UploadTask.active()) { status = "§c送信中です"; return; }
         try {
             long size = Files.size(selected);
@@ -165,11 +187,11 @@ public final class UploadScreen extends Screen {
                 return;
             }
             byte[] data = Files.readAllBytes(selected);
-            if (data.length < 4 || (data[0] & 0xFF) != 0x1F || (data[1] & 0xFF) != 0x8B) {
+            if (!plan && (data.length < 4 || (data[0] & 0xFF) != 0x1F || (data[1] & 0xFF) != 0x8B)) {
                 status = "§c.schem(Sponge Schematic)ではないようです";
                 return;
             }
-            UploadTask.start(idText, nameText.isEmpty() ? idText : nameText, catText, descText, data);
+            UploadTask.start(plan ? "plan" : "schem", idText, nameText.isEmpty() ? idText : nameText, catText, descText, data);
             client.setScreen(null);
         } catch (IOException e) {
             status = "§c読み込みに失敗しました: " + e.getMessage();
@@ -180,15 +202,16 @@ public final class UploadScreen extends Screen {
     public void render(MatrixStack m, int mx, int my, float delta) {
         renderBackground(m);
         drawCenteredText(m, textRenderer, Text.literal("建物をアップロード"), width / 2, 8, 0xFFFFFF);
-        textRenderer.draw(m, Text.literal("§7.schem をこの画面にドラッグ&ドロップ、または一覧から選択"), 10, 28, 0xAAAAAA);
+        textRenderer.draw(m, Text.literal("§7.schem(建物) または WebUIの city.json(街の計画) を選択 / ドラッグ&ドロップ"), 10, 28, 0xAAAAAA);
         int x = 260;
-        textRenderer.draw(m, Text.literal("ID (半角英数字 _ -)"), x, 50, 0xFFFFFF);
+        boolean planSel = selected != null && isPlan(selected);
+        textRenderer.draw(m, Text.literal(planSel ? "プラン名 (半角英数字 _ -) ※あなたの名前が前に付きます" : "ID (半角英数字 _ -)"), x, 50, 0xFFFFFF);
         textRenderer.draw(m, Text.literal("表示名"), x, 90, 0xFFFFFF);
         textRenderer.draw(m, Text.literal("カテゴリ"), x, 130, 0xFFFFFF);
         textRenderer.draw(m, Text.literal("説明"), x, 170, 0xFFFFFF);
         if (files.isEmpty()) {
             textRenderer.draw(m, Text.literal("§7(一覧が空です)"), 14, 50, 0xAAAAAA);
-            textRenderer.draw(m, Text.literal("§7置き場所: " + dropFolder().getFileName() + " / schematics / config/worldedit/schematics"), 10, height - 44, 0xAAAAAA);
+            textRenderer.draw(m, Text.literal("§7置き場所: " + dropFolder().getFileName() + " / schematics / worldedit/schematics / ダウンロード"), 10, height - 44, 0xAAAAAA);
         }
         if (!ClientCatalog.canUpload) {
             textRenderer.draw(m, Text.literal("§cこのサーバーではアップロード権限がありません"), x, 236, 0xFF5555);

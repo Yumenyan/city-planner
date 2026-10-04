@@ -57,6 +57,8 @@ public final class PlanLoader {
 
     private PlanLoader() {}
 
+    public static boolean validName(String n) { return n != null && n.length() <= 64 && NAME_RE.matcher(n).matches(); }
+
     public static Path planDir() { return CityConfig.dir().resolve("plans"); }
 
     public static List<String> list() {
@@ -231,7 +233,8 @@ public final class PlanLoader {
     public static void submit(Prepared pr) throws IOException {
         if (pr.jobs.isEmpty()) throw new IOException("実行できる項目がありません");
         GroupJob g = new GroupJob(pr.owner, pr.world, "plan:" + pr.name, pr.jobs);
-        if (!CityBuilderMod.jobs().canAccept(g.estimate())) throw new IOException("作業キューに入り切りません(規模が大きすぎます)");
+        String qe = CityBuilderMod.jobs().check(pr.owner, g.estimate());
+        if (qe != null) throw new IOException(qe);
         CityBuilderMod.jobs().submit(g);
     }
 }

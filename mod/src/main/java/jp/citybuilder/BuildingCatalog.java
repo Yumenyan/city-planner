@@ -32,6 +32,8 @@ public final class BuildingCatalog {
         public String description;
         public int floors;
         public int[] size;
+        /** アップロードしたプレイヤー名(アップロードされた建物のみ) */
+        public String author;
     }
 
     private static final class CatalogFile {
@@ -129,6 +131,28 @@ public final class BuildingCatalog {
         return id != null && id.length() <= 48 && ID_RE.matcher(id).matches();
     }
 
+    public int uploadedCount() { return uploaded.size(); }
+
+    public Entry uploadedEntry(String id) {
+        for (Entry e : uploaded) if (e.id.equals(id)) return e;
+        return null;
+    }
+
+    /** アップロードされた建物を削除する(同梱・手置きの建物は消さない)。 */
+    public synchronized boolean removeUpload(String id) throws IOException {
+        if (uploadedEntry(id) == null) return false;
+        uploaded.removeIf(x -> id.equals(x.id));
+        entries.remove(id);
+        templates.remove(id);
+        Files.deleteIfExists(CityConfig.dir().resolve("templates").resolve(id + ".schem"));
+        CatalogFile f = new CatalogFile();
+        f.buildings = uploaded;
+        try (Writer w = Files.newBufferedWriter(CityConfig.dir().resolve("uploads.json"), StandardCharsets.UTF_8)) {
+            new GsonBuilder().setPrettyPrinting().create().toJson(f, w);
+        }
+        return true;
+    }
+
     public boolean has(String id) { return entries.containsKey(id); }
 
     /** アップロードされたテンプレートを保存して登録する。 */
@@ -154,7 +178,7 @@ public final class BuildingCatalog {
     public int size() { return entries.size(); }
 
     /** クライアントに送る内容(ブロックデータは含まない) */
-    public String toClientJson(boolean canBuild, int maxDistance, boolean canUpload, int maxUploadBytes) {
+    public String toClientJson(boolean canBuild, int maxDistance, boolean canUpload, int maxUploadBytes, boolean withMaterials, List<String> plans) {
         JsonObject root = new JsonObject();
         root.addProperty("version", 2);
         root.addProperty("canBuild", canBuild);
@@ -169,12 +193,13 @@ public final class BuildingCatalog {
             o.addProperty("category", e.category);
             o.addProperty("description", e.description);
             o.addProperty("floors", e.floors);
+            if (e.author != null) o.addProperty("author", e.author);
             JsonArray sz = new JsonArray();
             sz.add(e.size[0]); sz.add(e.size[1]); sz.add(e.size[2]);
             o.add("size", sz);
             JsonArray mats = new JsonArray();
             Template t = templates.get(e.id);
-            if (t != null) {
+            if (t != null && withMaterials) {
                 for (Map.Entry<String, Integer> m : t.materials(16)) {
                     JsonObject mo = new JsonObject();
                     mo.addProperty("b", m.getKey());
@@ -186,6 +211,9 @@ public final class BuildingCatalog {
             arr.add(o);
         }
         root.add("buildings", arr);
+        JsonArray pl = new JsonArray();
+        if (plans != null) for (String n : plans) pl.add(n);
+        root.add("plans", pl);
         return root.toString();
     }
 }

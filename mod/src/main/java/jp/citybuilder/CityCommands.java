@@ -27,7 +27,7 @@ import java.util.UUID;
 /**
  * /citybuilder reload | list [category] | info <id> | place <id> <pos> [rotation]
  *              | road <from> <to> [width] [style] | area <from> <to> <style>
- *              | undo | cancel | status | plan list | plan load <name> [origin] (プレビュー) | plan confirm | plan cancel
+ *              | undo | cancel | status | plan list | plan load <name> [origin] (プレビュー) | plan confirm | plan cancel | remove <id>
  */
 public final class CityCommands {
     private CityCommands() {}
@@ -111,6 +111,26 @@ public final class CityCommands {
                                         .suggests((c, b) -> CommandSource.suggestMatching(jp.citybuilder.job.Styles.AREAS.keySet(), b))
                                         .executes(CityCommands::area)))));
 
+        root.then(CommandManager.literal("remove")
+                .then(CommandManager.argument("template", StringArgumentType.word())
+                        .suggests((c, b) -> CommandSource.suggestMatching(uploadedIds(), b))
+                        .executes(ctx -> {
+                            ServerCommandSource s = ctx.getSource();
+                            String id = StringArgumentType.getString(ctx, "template");
+                            BuildingCatalog.Entry e = CityBuilderMod.catalog().uploadedEntry(id);
+                            if (e == null) return fail(s, "アップロードされた建物ではありません(同梱の建物は削除できません)");
+                            ServerPlayerEntity p = playerOf(s);
+                            boolean mine = p != null && e.author != null && e.author.equalsIgnoreCase(p.getGameProfile().getName());
+                            if (!mine && !s.hasPermissionLevel(3)) return fail(s, "削除できるのはアップロードした本人かOP(レベル3)です");
+                            try {
+                                CityBuilderMod.catalog().removeUpload(id);
+                            } catch (IOException ex) {
+                                return fail(s, "削除に失敗しました: " + ex.getMessage());
+                            }
+                            ServerNet.broadcastCatalog(s.getServer());
+                            return ok(s, "削除しました: " + id);
+                        })));
+
         root.then(CommandManager.literal("undo").executes(ctx -> {
             if (CityBuilderMod.jobs().undo(ownerOf(ctx.getSource()))) return ok(ctx.getSource(), "直前の作業を元に戻します");
             return fail(ctx.getSource(), "戻せる履歴がありません");
@@ -149,6 +169,12 @@ public final class CityCommands {
     private static List<String> ids() {
         List<String> r = new ArrayList<>();
         for (BuildingCatalog.Entry e : CityBuilderMod.catalog().all()) r.add(e.id);
+        return r;
+    }
+
+    private static List<String> uploadedIds() {
+        List<String> r = new ArrayList<>();
+        for (BuildingCatalog.Entry e : CityBuilderMod.catalog().all()) if (CityBuilderMod.catalog().uploadedEntry(e.id) != null) r.add(e.id);
         return r;
     }
 
@@ -203,26 +229,9 @@ public final class CityCommands {
             origin = p.getBlockPos().down(); // 立っているブロック(地表)
         }
         String name = StringArgumentType.getString(ctx, "name");
-        try {
-            PlanLoader.Prepared pr = PlanLoader.prepare(s.getWorld(), p, name, origin);
-            PlanLoader.Result r = pr.result;
-            for (String e : r.errors) s.sendError(Text.literal("  スキップ " + e));
-            if (pr.jobs.isEmpty()) return fail(s, "実行できる項目がありません (" + r.skipped + " 件をスキップ)");
-            PlanSessions.put(p, pr);
-            String range = r.bounds == null ? "" : " / 範囲 X " + r.bounds[0] + "〜" + r.bounds[2] + ", Z " + r.bounds[1] + "〜" + r.bounds[3]
-                    + " (" + (r.bounds[2] - r.bounds[0] + 1) + "x" + (r.bounds[3] - r.bounds[1] + 1) + ")";
-            s.sendFeedback(Text.literal("プラン '" + name + "' のプレビュー: 建物 " + r.buildings + " / 道路 " + r.roads + " / 区画 " + r.areas
-                    + " (スキップ " + r.skipped + ") / 約 " + r.estimate + " ブロック / 原点 " + origin.toShortString() + range), false);
-            Text confirm = Text.literal("[確定して建築]").styled(st -> st.withColor(Formatting.GREEN).withBold(true)
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citybuilder plan confirm")));
-            Text cancel = Text.literal("[取り消し]").styled(st -> st.withColor(Formatting.RED)
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citybuilder plan cancel")));
-            s.sendFeedback(Text.literal("黄色の枠が街の範囲です(青=建物 白=道路 緑=区画)。 ").append(confirm).append(Text.literal(" ")).append(cancel)
-                    .append(Text.literal(" ※3分で期限切れ")), false);
-            return 1;
-        } catch (IOException e) {
-            return fail(s, e.getMessage());
-        }
+        boolean ok = PlanSessions.preview(s.getWorld(), p, name, origin,
+                t -> s.sendFeedback(t, false), e -> s.sendError(Text.literal(e)));
+        return ok ? 1 : 0;
     }
 
     private static int planConfirm(CommandContext<ServerCommandSource> ctx) {

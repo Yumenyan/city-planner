@@ -88,7 +88,7 @@ public final class CityBuilderClient implements ClientModInitializer {
         }
         if (PlanPreview.active()) {
             mc.textRenderer.drawWithShadow(m, Text.literal("§eプランのプレビュー: §f" + PlanPreview.name + " §7(" + PlanPreview.summary + ")"), 8, hy, 0xFFFFFF);
-            mc.textRenderer.drawWithShadow(m, Text.literal("§a/citybuilder plan confirm§7 で建築 / §c/citybuilder plan cancel§7 で取り消し"), 8, hy + 12, 0xFFFFFF);
+            mc.textRenderer.drawWithShadow(m, Text.literal("§aB→プランタブ または /citybuilder plan confirm§7 で建築 / §c plan cancel§7 で取り消し"), 8, hy + 12, 0xFFFFFF);
             hy += 28;
         }
         if (!PlacementMode.active()) return;
